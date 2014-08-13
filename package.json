@@ -1,0 +1,27 @@
+{
+    "name": "homegrown-sailing",
+    "description": "Bunch of sailing related functions and utilities.",
+    "version": "0.0.1",
+    "homepage": "http://homegrownmarine.com",
+    "keywords": [
+        "performance",
+        "sailing",
+        "analysis"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/HomegrownMarine/polar-table.git"
+    },
+    "bugs": "https://github.com/HomegrownMarine/polar-table/issues",
+    "licenses": [{
+        "type": "mit",
+        "url": "https://github.com/HomegrownMarine/polar-table/blob/master/LICENSE.md"
+    }],
+    "dependencies": {
+        "lodash": "*"
+    },
+    "devDependencies": {
+        "mocha": "*",
+        "chai": "*"
+    }
+}
