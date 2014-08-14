@@ -1,27 +1,35 @@
 {
-    "name": "homegrown-sailing",
-    "description": "Bunch of sailing related functions and utilities.",
-    "version": "0.0.1",
-    "homepage": "http://homegrownmarine.com",
-    "keywords": [
-        "performance",
-        "sailing",
-        "analysis"
-    ],
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/HomegrownMarine/polar-table.git"
-    },
-    "bugs": "https://github.com/HomegrownMarine/polar-table/issues",
-    "licenses": [{
-        "type": "mit",
-        "url": "https://github.com/HomegrownMarine/polar-table/blob/master/LICENSE.md"
-    }],
-    "dependencies": {
-        "lodash": "*"
-    },
-    "devDependencies": {
-        "mocha": "*",
-        "chai": "*"
+  "name": "homegrown-sailing",
+  "description": "Bunch of sailing related functions and utilities.",
+  "version": "0.0.1",
+  "homepage": "http://homegrownmarine.com",
+  "main": "dest/sailing.js",
+  "keywords": [
+    "performance",
+    "sailing",
+    "analysis"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HomegrownMarine/polar-table.git"
+  },
+  "bugs": "https://github.com/HomegrownMarine/polar-table/issues",
+  "licenses": [
+    {
+      "type": "mit",
+      "url": "https://github.com/HomegrownMarine/polar-table/blob/master/LICENSE.md"
     }
+  ],
+  "dependencies": {
+    "lodash": "*"
+  },
+  "devDependencies": {
+    "mocha": "*",
+    "chai": "*",
+    "grunt": "^0.4.5",
+    "grunt-contrib-jshint": "^0.10.0",
+    "grunt-contrib-uglify": "^0.5.1",
+    "grunt-contrib-watch": "^0.6.1",
+    "grunt-contrib-concat": "^0.5.0"
+  }
 }
