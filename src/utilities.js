@@ -1,6 +1,9 @@
-"use strict";
+(function(_) {
+    "use strict";
 
-(function() {
+    if( typeof _ == 'undefined' && typeof require == 'function' ) {
+        _ = require('lodash');
+    }
 
     //from stack overflow
     var remove_comments_regex = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
@@ -99,4 +102,4 @@
         }
         homegrown.streamingUtilities = utilities;
     }
-})();
+})(_);

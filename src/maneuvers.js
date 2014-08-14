@@ -1,8 +1,9 @@
-"use strict";
-
-(function() {
-
-    // TODO: var _;
+(function(_) {
+    "use strict";
+    
+    if( typeof _ == 'undefined' && typeof require == 'function' ) {
+        _ = require('lodash');
+    }
 
     //each of these functions takes a "tack" object, and 
     //a section of data around the tack and adds some specific
@@ -262,4 +263,4 @@
         }
         homegrown.streamingUtilities = utilities;
     }
-})();
+})(_);

@@ -1,7 +1,5 @@
-
-"use strict";
-
 (function() {
+    "use strict";
 
     var R = '3440.06479'; //radius of earth in nautical miles
 
