@@ -11,13 +11,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/HomegrownMarine/polar-table.git"
+    "url": "https://github.com/HomegrownMarine/sailing_calculations.git"
   },
-  "bugs": "https://github.com/HomegrownMarine/polar-table/issues",
+  "bugs": "https://github.com/HomegrownMarine/sailing_calculations/issues",
   "licenses": [
     {
       "type": "mit",
-      "url": "https://github.com/HomegrownMarine/polar-table/blob/master/LICENSE.md"
+      "url": "https://github.com/HomegrownMarine/sailing_calculations/blob/master/LICENSE.md"
     }
   ],
   "dependencies": {
@@ -30,6 +30,7 @@
     "grunt-contrib-jshint": "^0.10.0",
     "grunt-contrib-uglify": "^0.5.1",
     "grunt-contrib-watch": "^0.6.1",
-    "grunt-contrib-concat": "^0.5.0"
+    "grunt-contrib-concat": "^0.5.0",
+    "grunt-mocha-test": "^0.11.0"
   }
 }

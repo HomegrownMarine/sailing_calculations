@@ -5,11 +5,11 @@
 
     var deg = exports.deg = function deg(radians) {
         return (radians*180/Math.PI + 360) % 360;
-    }    
+    };
 
     var rad = exports.rad = function rad(degrees) {
         return degrees * Math.PI / 180;
-    }
+    };
 
     var calcs = {
         tws: function tws(speed, awa, aws) {
@@ -18,9 +18,9 @@
         },
 
         twa: function twa(speed, awa, tws) {
-            var twa = deg(Math.asin(speed * Math.sin(rad(Math.abs(awa))) / tws)) + Math.abs(awa);
-            if (awa < 0) twa *= -1;
-            return twa
+            var angle = deg(Math.asin(speed * Math.sin(rad(Math.abs(awa))) / tws)) + Math.abs(awa);
+            if (awa < 0) angle *= -1;
+            return angle;
         },
 
         vmg: function vmg(speed, twa) {
@@ -48,10 +48,10 @@
         },
 
         bearing: function bearing(lat1, lon1, lat2, lon2) {
-            lat1 = rad(lat1)
-            lat2 = rad(lat2)
-            lon1 = rad(lon1)
-            lon2 = rad(lon2)
+            lat1 = rad(lat1);
+            lat2 = rad(lat2);
+            lon1 = rad(lon1);
+            lon2 = rad(lon2);
             
             var dLon = lon2-lon1;
             
@@ -87,7 +87,7 @@
         drift: function drift(sog, cog) {
 
         }
-    }
+    };
 
     
     if (typeof exports != 'undefined') {
@@ -100,4 +100,4 @@
         }
         homegrown.calculations = calcs;
     }
-});
+})();

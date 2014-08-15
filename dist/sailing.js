@@ -1,5 +1,106 @@
-(function(_) {
+(function() {
     "use strict";
+
+    var R = '3440.06479'; //radius of earth in nautical miles
+
+    var deg = exports.deg = function deg(radians) {
+        return (radians*180/Math.PI + 360) % 360;
+    }    
+
+    var rad = exports.rad = function rad(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+    var calcs = {
+        tws: function tws(speed, awa, aws) {
+            //TODO: heel compensation
+            return Math.sqrt(speed * speed + aws * aws - 2 * aws * speed * Math.cos(rad(Math.abs(awa))));
+        },
+
+        twa: function twa(speed, awa, tws) {
+            var twa = deg(Math.asin(speed * Math.sin(rad(Math.abs(awa))) / tws)) + Math.abs(awa);
+            if (awa < 0) twa *= -1;
+            return twa
+        },
+
+        vmg: function vmg(speed, twa) {
+            return Math.abs(speed * Math.cos(rad(twa)));
+        },
+
+        twd: function twd(hdg, twa) {
+            return (hdg + twa + 360) % 360;
+        },
+
+        //see: http://www.movable-type.co.uk/scripts/latlong.html
+        distance: function distance(lat1, lon1, lat2, lon2) {
+            lat1 = rad(lat1);
+            lat2 = rad(lat2);
+            lon1 = rad(lon1);
+            lon2 = rad(lon2);
+
+            var dLat = lat2-lat1,
+                dLon = lon2-lon1;
+            
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c;
+        },
+
+        bearing: function bearing(lat1, lon1, lat2, lon2) {
+            lat1 = rad(lat1)
+            lat2 = rad(lat2)
+            lon1 = rad(lon1)
+            lon2 = rad(lon2)
+            
+            var dLon = lon2-lon1;
+            
+            var y = Math.sin(dLon) * Math.cos(lat2);
+            var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+            
+            return deg( Math.atan2(y, x) );
+        },
+
+        steer: function steer(from, to) {
+            var diff = to - from;
+            if ( diff > 180 ) {
+                diff = 360 - diff;
+            }
+            else if ( diff < -180 ) {
+                diff = 360 + diff;
+            }
+
+            return diff;
+        },
+
+        crossTrackError: function crossTrackError(fromLat, fromLon, lat, lon, toLat, toLan) {
+            var d = distance(fromLat, fromLon, toLat, toLan);
+            var b1 = bearing(fromLat, fromLon, toLat, toLan);
+            var b2 = bearing(fromLat, fromLon, lat, lon);
+            return Math.asin(Math.sin(d/R) * Math.sin(rad(b2-b1))) * R;
+        },
+
+        set: function set(sog, cog) {
+
+        },
+
+        drift: function drift(sog, cog) {
+
+        }
+    }
+
+    
+    if (typeof exports != 'undefined') {
+        exports = calcs;
+    } else if (typeof module !== 'undefined' && module.exports) {
+        module.exports = calcs;
+    } else {
+        if ( !homegrown ) {
+            homegrown = {};
+        }
+        homegrown.calculations = calcs;
+    }
+});;(function(_) {
 
     if( typeof _ == 'undefined' && typeof require == 'function' ) {
         _ = require('lodash');
@@ -118,7 +219,7 @@
             }
 
             //TODO: find better fallback
-            tack.timing.recovered = tack.timing.recovered || (tack.timing.center+30);
+            tack.timing.recovered = tack.timing.recovered || (tack.timing.center+30)
         },
 
         findRecoveryMetrics: function findRecoveryMetrics(tack, data) {
@@ -152,10 +253,10 @@
         calculateLoss: function calculateLoss(tack, data) {
             var lastTime = 0;
             var covered = 0;
-            var recovered = tack.timing.recovered;
+            var recovered = tack.timing.recovered
             
             _(data)
-                .filter(function(m) { return m.t >= tack.timing.start && m.t <= recovered; } )
+                .filter(function(m) { return m.t >= tack.timing.start && m.t <= recovered } )
                 .each(function(m) {
                     if ('vmg' in m) {
                         if ( lastTime ) {
@@ -192,11 +293,7 @@
                 if (last_board != board) {
                     last_board = board;
                     //TODO: object with start time, end time, and board.
-                    maneuvers.push({
-                        board: last_board,
-                        start: 0,
-                        end: data[i].t
-                    });
+                    maneuvers.push([board, data[i].t]);
                 }
 
             }
@@ -255,6 +352,110 @@
         }
 
         return tacks;
+    }
+
+    if (typeof exports != 'undefined') {
+        exports = utilities;
+    } else if (typeof module !== 'undefined' && module.exports) {
+        module.exports = utilities;
+    } else {
+        if ( !homegrown ) {
+            homegrown = {};
+        }
+        homegrown.streamingUtilities = utilities;
+    }
+})(_);;(function(_) {
+    "use strict";
+
+    if( typeof _ == 'undefined' && typeof require == 'function' ) {
+        _ = require('lodash');
+    }
+
+    //from stack overflow
+    var remove_comments_regex = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
+    var argument_names_regex = /([^\s,]+)/g;
+    function getParamNames(funct) {
+      var fnStr = funct.toString().replace(remove_comments_regex, '');
+      var result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(argument_names_regex);
+      if ( result === null );
+         result = [];
+      return result;
+    }
+
+    var utilities = {
+        /**
+         * given a metric, will compute it's derivitive.
+         * @param name - the name of the derivitive
+         * @param metric - the name of the metric to calculate the derivitive from
+         * @param [scaleFactor] - optional conversion factor, if the new metric should
+         *                        be in different units.
+         * @return 
+
+         * Example: var acceleration = derivitive('acceleration', 'speed');
+         * assert acceleration({'speed': 5, 't':1000}) == null //first execution
+         * assert acceleration({'speed': 5, 't':1000}) == {'acceleration': 0}
+         * assert acceleration({'speed': 6, 't':1000}) == {'acceleration': 1}
+         */
+        derivitive: function derivitive(name, metric, scaleFactor) {
+            scaleFactor = scaleFactor || 1;
+            var lastValue = null, lastTime;
+
+            return function(args) {
+                var result = null;
+
+                if (metric in args) {
+                    if (lastValue != null) {
+                        var delta = (args[metric] - lastValue) / ((args.t - lastTime)/1000) * scaleFactor;
+
+                        result = {};
+                        result[name] = delta;
+                    }
+
+                    lastValue = args[metric];
+                    lastTime = args.t;
+                }
+
+                return result;
+            }
+        },
+        /**
+         * Wraps function to allow it to handle streaming inputs.  
+         * @param funct - the name of the function will be used to name the return value.  
+         *                The name of the arguments will be used to pull the arguments out 
+         *                of maps of possible arguments.
+         * @return {object} - will return null if all of the arguments aren't avaible to execute the
+         *                    function, or an object of the form: {function_name: result}.
+         */
+        delayedInputs: function delayedInputs(funct) {
+            var argumentNames = getParamNames(funct);
+            var runningArgs = [];
+
+            return function(args) {
+                var presentValues = _.map(argumentNames, function(name) { return args[name] });
+
+                var allSet = true;
+                for( var i=0; i < argumentNames.length; i++ ) {
+                    if ( presentValues[i] ) {
+                        runningArgs[i] = presentValues[i];
+                    }
+
+                    if ( !runningArgs[i] ) {
+                        allSet = false;
+                    }
+                }
+
+                //if all 
+                if (allSet) {
+                    var result = funct.apply(this, runningArgs);
+                    runningArgs = [];
+                    var obj = {};
+                    obj[funct.name] = result;
+                    return obj;
+                }
+
+                return null;
+            }
+        }
     }
 
     if (typeof exports != 'undefined') {

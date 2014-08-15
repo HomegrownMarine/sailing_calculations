@@ -38,7 +38,7 @@
                 var result = null;
 
                 if (metric in args) {
-                    if (lastValue != null) {
+                    if (lastValue !== null) {
                         var delta = (args[metric] - lastValue) / ((args.t - lastTime)/1000) * scaleFactor;
 
                         result = {};
@@ -50,7 +50,7 @@
                 }
 
                 return result;
-            }
+            };
         },
         /**
          * Wraps function to allow it to handle streaming inputs.  
@@ -65,7 +65,7 @@
             var runningArgs = [];
 
             return function(args) {
-                var presentValues = _.map(argumentNames, function(name) { return args[name] });
+                var presentValues = _.map(argumentNames, function(name) { return args[name]; });
 
                 var allSet = true;
                 for( var i=0; i < argumentNames.length; i++ ) {
@@ -88,9 +88,9 @@
                 }
 
                 return null;
-            }
+            };
         }
-    }
+    };
 
     if (typeof exports != 'undefined') {
         exports = utilities;
