@@ -3,11 +3,11 @@
 
     var R = '3440.06479'; //radius of earth in nautical miles
 
-    var deg = exports.deg = function deg(radians) {
+    var deg = function deg(radians) {
         return (radians*180/Math.PI + 360) % 360;
     };
 
-    var rad = exports.rad = function rad(degrees) {
+    var rad = function rad(degrees) {
         return degrees * Math.PI / 180;
     };
 
@@ -95,8 +95,8 @@
     } else if (typeof module !== 'undefined' && module.exports) {
         module.exports = calcs;
     } else {
-        if ( !homegrown ) {
-            homegrown = {};
+        if ( typeof homegrown == 'undefined' ) {
+            window.homegrown = {};
         }
         homegrown.calculations = calcs;
     }

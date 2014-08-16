@@ -11,7 +11,7 @@
     function getParamNames(funct) {
       var fnStr = funct.toString().replace(remove_comments_regex, '');
       var result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(argument_names_regex);
-      if ( result === null );
+      if ( result === null )
          result = [];
       return result;
     }
@@ -97,8 +97,8 @@
     } else if (typeof module !== 'undefined' && module.exports) {
         module.exports = utilities;
     } else {
-        if ( !homegrown ) {
-            homegrown = {};
+        if ( typeof homegrown == 'undefined' ) {
+            window.homegrown = {};
         }
         homegrown.streamingUtilities = utilities;
     }

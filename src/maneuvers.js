@@ -174,7 +174,8 @@
         var maneuvers = [];
 
         //fimd maneuvers
-        var last_board = null;
+        var lastBoard = null;
+        var lastBoardStart = data[0].t;
         for (var i = 0; i < data.length; i++) {
             if ( 'twa' in data[i] ) {
                 var board = 'U-S';
@@ -189,14 +190,15 @@
                     board = "PS";
                 }
 
-                if (last_board != board) {
-                    last_board = board;
+                if (lastBoard != board) {
                     //TODO: object with start time, end time, and board.
                     maneuvers.push({
-                        board: last_board,
-                        start: 0,
+                        board: board,
+                        start: lastBoardStart,
                         end: data[i].t
                     });
+                    lastBoard = board;
+                    lastBoardStart = data[i].t;
                 }
 
             }
@@ -212,21 +214,21 @@
         //moment.max
         for (var i = 2; i < maneuvers.length; i++) {
             //TODO: gybes too
-            if (maneuvers[i][0].charAt(0) == 'U' && maneuvers[i - 1][0].charAt(0) == 'U') {
-                var centerTime = moment(maneuvers[i][1]);
+            if (maneuvers[i].board.charAt(0) == 'U' && maneuvers[i - 1].board.charAt(0) == 'U') {
+                var centerTime = moment(maneuvers[i].start);
 
-                if ( maneuvers[i-1][0] == "PS" )
+                if ( maneuvers[i-1].board == "PS" )
                     return;
                 // if (i + 1 < maneuvers.length) {
-                //     var nextTime = moment(maneuvers[i + 1][1]).subtract('seconds', 45);
+                //     var nextTime = moment(maneuvers[i + 1].start).subtract('seconds', 45);
                 //     if (nextTime < centerTime)
                 //         continue
                 // }
 
-                var from = moment(maneuvers[i][1]).subtract('seconds', 20);
+                var from = moment(maneuvers[i].start).subtract('seconds', 20);
                 var fromIdx = _.sortedIndex(data, {t: from}, function(d) { return d.t; });
 
-                var to = moment(maneuvers[i][1]).add('seconds', 120);
+                var to = moment(maneuvers[i].start).add('seconds', 120);
                 var toIdx = _.sortedIndex(data, {t: to}, function(d) { return d.t; });            
 
                 var range = data.slice(fromIdx, toIdx+1);
@@ -234,7 +236,7 @@
 
                 var tack = {
                     time: centerTime,
-                    board: maneuvers[i][0],
+                    board: maneuvers[i].board,
                     timing: {}
                 };
 
@@ -246,8 +248,8 @@
                 tackUtils.findRecoveryTime(tack, range);
                 tackUtils.findRecoveryMetrics(tack, range);
 
-                convertIndexesToTimes(tack, range);
-                calculateLoss(tack, range);
+                tackUtils.convertIndexesToTimes(tack, range);
+                tackUtils.calculateLoss(tack, range);
 
                 tacks.push(tack);
                 // break;
@@ -257,14 +259,19 @@
         return tacks;
     }
 
+    var maneuverUtilities = {
+        findManeuvers: findManeuvers,
+        analyzeTacks: analyzeTacks
+    };
+
     if (typeof exports != 'undefined') {
-        exports = utilities;
-    } else if (typeof module !== 'undefined' && module.exports) {
-        module.exports = utilities;
+        exports = maneuverUtilities;
+    } else if (typeof module != 'undefined' && module.exports) {
+        module.exports = maneuverUtilities;
     } else {
-        if ( !homegrown ) {
-            homegrown = {};
+        if ( typeof homegrown == 'undefined' ) {
+            window.homegrown = {};
         }
-        homegrown.streamingUtilities = utilities;
+        homegrown.maneuvers = maneuverUtilities;
     }
 })(_);

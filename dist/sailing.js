@@ -3,13 +3,13 @@
 
     var R = '3440.06479'; //radius of earth in nautical miles
 
-    var deg = exports.deg = function deg(radians) {
+    var deg = function deg(radians) {
         return (radians*180/Math.PI + 360) % 360;
-    }    
+    };
 
-    var rad = exports.rad = function rad(degrees) {
+    var rad = function rad(degrees) {
         return degrees * Math.PI / 180;
-    }
+    };
 
     var calcs = {
         tws: function tws(speed, awa, aws) {
@@ -18,9 +18,9 @@
         },
 
         twa: function twa(speed, awa, tws) {
-            var twa = deg(Math.asin(speed * Math.sin(rad(Math.abs(awa))) / tws)) + Math.abs(awa);
-            if (awa < 0) twa *= -1;
-            return twa
+            var angle = deg(Math.asin(speed * Math.sin(rad(Math.abs(awa))) / tws)) + Math.abs(awa);
+            if (awa < 0) angle *= -1;
+            return angle;
         },
 
         vmg: function vmg(speed, twa) {
@@ -48,10 +48,10 @@
         },
 
         bearing: function bearing(lat1, lon1, lat2, lon2) {
-            lat1 = rad(lat1)
-            lat2 = rad(lat2)
-            lon1 = rad(lon1)
-            lon2 = rad(lon2)
+            lat1 = rad(lat1);
+            lat2 = rad(lat2);
+            lon1 = rad(lon1);
+            lon2 = rad(lon2);
             
             var dLon = lon2-lon1;
             
@@ -87,7 +87,7 @@
         drift: function drift(sog, cog) {
 
         }
-    }
+    };
 
     
     if (typeof exports != 'undefined') {
@@ -95,12 +95,13 @@
     } else if (typeof module !== 'undefined' && module.exports) {
         module.exports = calcs;
     } else {
-        if ( !homegrown ) {
-            homegrown = {};
+        if ( typeof homegrown == 'undefined' ) {
+            window.homegrown = {};
         }
         homegrown.calculations = calcs;
     }
-});;(function(_) {
+})();;(function(_) {
+    "use strict";
 
     if( typeof _ == 'undefined' && typeof require == 'function' ) {
         _ = require('lodash');
@@ -219,7 +220,7 @@
             }
 
             //TODO: find better fallback
-            tack.timing.recovered = tack.timing.recovered || (tack.timing.center+30)
+            tack.timing.recovered = tack.timing.recovered || (tack.timing.center+30);
         },
 
         findRecoveryMetrics: function findRecoveryMetrics(tack, data) {
@@ -253,10 +254,10 @@
         calculateLoss: function calculateLoss(tack, data) {
             var lastTime = 0;
             var covered = 0;
-            var recovered = tack.timing.recovered
+            var recovered = tack.timing.recovered;
             
             _(data)
-                .filter(function(m) { return m.t >= tack.timing.start && m.t <= recovered } )
+                .filter(function(m) { return m.t >= tack.timing.start && m.t <= recovered; } )
                 .each(function(m) {
                     if ('vmg' in m) {
                         if ( lastTime ) {
@@ -275,7 +276,8 @@
         var maneuvers = [];
 
         //fimd maneuvers
-        var last_board = null;
+        var lastBoard = null;
+        var lastBoardStart = data[0].t;
         for (var i = 0; i < data.length; i++) {
             if ( 'twa' in data[i] ) {
                 var board = 'U-S';
@@ -290,10 +292,15 @@
                     board = "PS";
                 }
 
-                if (last_board != board) {
-                    last_board = board;
+                if (lastBoard != board) {
                     //TODO: object with start time, end time, and board.
-                    maneuvers.push([board, data[i].t]);
+                    maneuvers.push({
+                        board: board,
+                        start: lastBoardStart,
+                        end: data[i].t
+                    });
+                    lastBoard = board;
+                    lastBoardStart = data[i].t;
                 }
 
             }
@@ -309,21 +316,21 @@
         //moment.max
         for (var i = 2; i < maneuvers.length; i++) {
             //TODO: gybes too
-            if (maneuvers[i][0].charAt(0) == 'U' && maneuvers[i - 1][0].charAt(0) == 'U') {
-                var centerTime = moment(maneuvers[i][1]);
+            if (maneuvers[i].board.charAt(0) == 'U' && maneuvers[i - 1].board.charAt(0) == 'U') {
+                var centerTime = moment(maneuvers[i].start);
 
-                if ( maneuvers[i-1][0] == "PS" )
+                if ( maneuvers[i-1].board == "PS" )
                     return;
                 // if (i + 1 < maneuvers.length) {
-                //     var nextTime = moment(maneuvers[i + 1][1]).subtract('seconds', 45);
+                //     var nextTime = moment(maneuvers[i + 1].start).subtract('seconds', 45);
                 //     if (nextTime < centerTime)
                 //         continue
                 // }
 
-                var from = moment(maneuvers[i][1]).subtract('seconds', 20);
+                var from = moment(maneuvers[i].start).subtract('seconds', 20);
                 var fromIdx = _.sortedIndex(data, {t: from}, function(d) { return d.t; });
 
-                var to = moment(maneuvers[i][1]).add('seconds', 120);
+                var to = moment(maneuvers[i].start).add('seconds', 120);
                 var toIdx = _.sortedIndex(data, {t: to}, function(d) { return d.t; });            
 
                 var range = data.slice(fromIdx, toIdx+1);
@@ -331,7 +338,7 @@
 
                 var tack = {
                     time: centerTime,
-                    board: maneuvers[i][0],
+                    board: maneuvers[i].board,
                     timing: {}
                 };
 
@@ -343,8 +350,8 @@
                 tackUtils.findRecoveryTime(tack, range);
                 tackUtils.findRecoveryMetrics(tack, range);
 
-                convertIndexesToTimes(tack, range);
-                calculateLoss(tack, range);
+                tackUtils.convertIndexesToTimes(tack, range);
+                tackUtils.calculateLoss(tack, range);
 
                 tacks.push(tack);
                 // break;
@@ -354,15 +361,20 @@
         return tacks;
     }
 
+    var maneuverUtilities = {
+        findManeuvers: findManeuvers,
+        analyzeTacks: analyzeTacks
+    };
+
     if (typeof exports != 'undefined') {
-        exports = utilities;
-    } else if (typeof module !== 'undefined' && module.exports) {
-        module.exports = utilities;
+        exports = maneuverUtilities;
+    } else if (typeof module != 'undefined' && module.exports) {
+        module.exports = maneuverUtilities;
     } else {
-        if ( !homegrown ) {
-            homegrown = {};
+        if ( typeof homegrown == 'undefined' ) {
+            window.homegrown = {};
         }
-        homegrown.streamingUtilities = utilities;
+        homegrown.maneuvers = maneuverUtilities;
     }
 })(_);;(function(_) {
     "use strict";
@@ -377,7 +389,7 @@
     function getParamNames(funct) {
       var fnStr = funct.toString().replace(remove_comments_regex, '');
       var result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(argument_names_regex);
-      if ( result === null );
+      if ( result === null )
          result = [];
       return result;
     }
@@ -404,7 +416,7 @@
                 var result = null;
 
                 if (metric in args) {
-                    if (lastValue != null) {
+                    if (lastValue !== null) {
                         var delta = (args[metric] - lastValue) / ((args.t - lastTime)/1000) * scaleFactor;
 
                         result = {};
@@ -416,7 +428,7 @@
                 }
 
                 return result;
-            }
+            };
         },
         /**
          * Wraps function to allow it to handle streaming inputs.  
@@ -431,7 +443,7 @@
             var runningArgs = [];
 
             return function(args) {
-                var presentValues = _.map(argumentNames, function(name) { return args[name] });
+                var presentValues = _.map(argumentNames, function(name) { return args[name]; });
 
                 var allSet = true;
                 for( var i=0; i < argumentNames.length; i++ ) {
@@ -454,17 +466,17 @@
                 }
 
                 return null;
-            }
+            };
         }
-    }
+    };
 
     if (typeof exports != 'undefined') {
         exports = utilities;
     } else if (typeof module !== 'undefined' && module.exports) {
         module.exports = utilities;
     } else {
-        if ( !homegrown ) {
-            homegrown = {};
+        if ( typeof homegrown == 'undefined' ) {
+            window.homegrown = {};
         }
         homegrown.streamingUtilities = utilities;
     }
