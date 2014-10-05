@@ -91,7 +91,7 @@
 
     
     if (typeof exports != 'undefined') {
-        exports = calcs;
+        exports.Calcs = calcs;
     } else if (typeof module !== 'undefined' && module.exports) {
         module.exports = calcs;
     } else {
@@ -100,10 +100,14 @@
         }
         homegrown.calculations = calcs;
     }
-})();;(function(_) {
+})();;(function() {
     "use strict";
+    var _;
 
-    if( typeof _ == 'undefined' && typeof require == 'function' ) {
+    if ( typeof window != 'undefined' ) {
+        _ = window._;
+    }
+    else if( typeof require == 'function' ) {
         _ = require('lodash');
     }
 
@@ -293,12 +297,13 @@
                 }
 
                 if (lastBoard != board) {
-                    //TODO: object with start time, end time, and board.
-                    maneuvers.push({
-                        board: board,
-                        start: lastBoardStart,
-                        end: data[i].t
-                    });
+                    if ( lastBoard !== null ) {
+                        maneuvers.push({
+                            board: lastBoard,
+                            start: lastBoardStart,
+                            end: data[i].t
+                        });
+                    }
                     lastBoard = board;
                     lastBoardStart = data[i].t;
                 }
@@ -367,19 +372,23 @@
     };
 
     if (typeof exports != 'undefined') {
-        exports = maneuverUtilities;
+        exports.Maneuvers = maneuverUtilities;
     } else if (typeof module != 'undefined' && module.exports) {
-        module.exports = maneuverUtilities;
+        module.exports.Maneuvers = maneuverUtilities;
     } else {
         if ( typeof homegrown == 'undefined' ) {
             window.homegrown = {};
         }
         homegrown.maneuvers = maneuverUtilities;
     }
-})(_);;(function(_) {
+})();;(function() {
     "use strict";
+    var _;
 
-    if( typeof _ == 'undefined' && typeof require == 'function' ) {
+    if ( typeof window != 'undefined' ) {
+        _ = window._;
+    }
+    else if ( typeof require == 'function' ) {
         _ = require('lodash');
     }
 
@@ -471,13 +480,13 @@
     };
 
     if (typeof exports != 'undefined') {
-        exports = utilities;
+        exports.Utilities = utilities;
     } else if (typeof module !== 'undefined' && module.exports) {
-        module.exports = utilities;
+        module.exports.Utilities = utilities;
     } else {
         if ( typeof homegrown == 'undefined' ) {
             window.homegrown = {};
         }
         homegrown.streamingUtilities = utilities;
     }
-})(_);
+})();

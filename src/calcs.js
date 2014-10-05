@@ -91,7 +91,7 @@
 
     
     if (typeof exports != 'undefined') {
-        exports = calcs;
+        exports.calcs = calcs;
     } else if (typeof module !== 'undefined' && module.exports) {
         module.exports = calcs;
     } else {

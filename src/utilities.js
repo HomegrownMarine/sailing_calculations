@@ -1,7 +1,11 @@
-(function(_) {
+(function() {
     "use strict";
+    var _;
 
-    if( typeof _ == 'undefined' && typeof require == 'function' ) {
+    if ( typeof window != 'undefined' ) {
+        _ = window._;
+    }
+    else if ( typeof require == 'function' ) {
         _ = require('lodash');
     }
 
@@ -93,13 +97,13 @@
     };
 
     if (typeof exports != 'undefined') {
-        exports = utilities;
+        exports.utilities = utilities;
     } else if (typeof module !== 'undefined' && module.exports) {
-        module.exports = utilities;
+        module.exports.utilities = utilities;
     } else {
         if ( typeof homegrown == 'undefined' ) {
             window.homegrown = {};
         }
         homegrown.streamingUtilities = utilities;
     }
-})(_);
+})();
