@@ -56,6 +56,32 @@
                 return result;
             };
         },
+        average: function average(name, metric, size) {
+            var rolling = 0;
+            var counter = 0;
+            var windowX = [];
+
+            return function(args) {
+                var result = null;
+
+                if (metric in args) {
+                    var pos = counter % size;
+                    counter++;
+
+                    if (windowX[pos]) {
+                        rolling -= windowX[pos];
+                    }
+                    rolling += args[metric];
+                    windowX[pos] = args[metric];
+
+                    result = {};
+                    result[name] = rolling / windowX.length;
+                }
+
+                return result;
+            };
+        },
+
         /**
          * Wraps function to allow it to handle streaming inputs.  
          * @param funct - the name of the function will be used to name the return value.  
