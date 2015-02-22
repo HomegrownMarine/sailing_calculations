@@ -106,7 +106,7 @@
             //set is the angle of the current vector (note we special case pure North or South)
             var _set = 0;
             if ( current_x === 0 ) {
-                _set = curr_y < 0? 180: 0;
+                _set = current_y < 0? 180: 0;
             }
             else {
                 //normalize 0 - 360

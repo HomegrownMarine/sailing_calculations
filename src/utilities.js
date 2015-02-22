@@ -95,12 +95,12 @@
             var runningArgs = [];
 
             return function(args) {
-                var presentValues = _.map(argumentNames, function(name) { return args[name]; });
+                // var presentValues = _.map(argumentNames, function(name) { return args[name]; });
 
                 var allSet = true;
                 for( var i=0; i < argumentNames.length; i++ ) {
-                    if ( presentValues[i] ) {
-                        runningArgs[i] = presentValues[i];
+                    if ( argumentNames[i] in args ) {
+                        runningArgs[i] = args[argumentNames[i]];
                     }
 
                     if ( !runningArgs[i] ) {
