@@ -1,12 +1,14 @@
 (function() {
     "use strict";
-    var _;
+    var _, moment;
 
     if ( typeof window != 'undefined' ) {
         _ = window._;
+        moment = window.moment;
     }
     else if( typeof require == 'function' ) {
         _ = require('lodash');
+        moment = require('moment');
     }
 
     //each of these functions takes a "tack" object, and 

@@ -106,7 +106,7 @@
             //set is the angle of the current vector (note we special case pure North or South)
             var _set = 0;
             if ( current_x === 0 ) {
-                _set = curr_y < 0? 180: 0;
+                _set = current_y < 0? 180: 0;
             }
             else {
                 //normalize 0 - 360
@@ -145,13 +145,15 @@
 })();
 ;(function() {
     "use strict";
-    var _;
+    var _, moment;
 
     if ( typeof window != 'undefined' ) {
         _ = window._;
+        moment = window.moment;
     }
     else if( typeof require == 'function' ) {
         _ = require('lodash');
+        moment = require('moment');
     }
 
     //each of these functions takes a "tack" object, and 
@@ -375,10 +377,10 @@
                 //         continue
                 // }
 
-                var from = moment(maneuvers[i].start).subtract('seconds', 20);
+                var from = moment(maneuvers[i].start).subtract(20, 'seconds');
                 var fromIdx = _.sortedIndex(data, {t: from}, function(d) { return d.t; });
 
-                var to = moment(maneuvers[i].start).add('seconds', 120);
+                var to = moment(maneuvers[i].start).add(120, 'seconds');
                 var toIdx = _.sortedIndex(data, {t: to}, function(d) { return d.t; });            
 
                 var range = data.slice(fromIdx, toIdx+1);
@@ -521,12 +523,12 @@
             var runningArgs = [];
 
             return function(args) {
-                var presentValues = _.map(argumentNames, function(name) { return args[name]; });
+                // var presentValues = _.map(argumentNames, function(name) { return args[name]; });
 
                 var allSet = true;
                 for( var i=0; i < argumentNames.length; i++ ) {
-                    if ( presentValues[i] ) {
-                        runningArgs[i] = presentValues[i];
+                    if ( argumentNames[i] in args ) {
+                        runningArgs[i] = args[argumentNames[i]];
                     }
 
                     if ( !runningArgs[i] ) {

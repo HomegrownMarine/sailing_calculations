@@ -21,7 +21,8 @@
     }
   ],
   "dependencies": {
-    "lodash": "*"
+    "lodash": "*",
+    "moment": "^2.9.0"
   },
   "devDependencies": {
     "mocha": "*",
