@@ -41,6 +41,7 @@
                 }
             }
 
+            //TODO, default not idx based... alarm on had to use default
             tack.timing.start = startIdx  || 15;
             tack.startPosition = [data[tack.timing.start].lon, data[tack.timing.start].lat];
         },
@@ -96,6 +97,7 @@
                     if (!('twa' in data[minIdx])) {
                         minIdx = j;
                     }
+
                     if (findMax) {
                         if (data[j].twa > data[minIdx].twa) {
                             minIdx = j;
@@ -214,6 +216,23 @@
         return maneuvers;
     }
 
+    function getRangeX(data, time, timeBefore, timeAfter) {
+        if ( timeBefore === undefined ) timeBefore = 30;
+        if ( timeAfter === undefined ) timeAfter = 45;
+        var from = moment(time).subtract(timeBefore, 'seconds');
+        var to = moment(time).add(timeAfter, 'seconds');
+
+        return getRange(data, from, to);
+    }
+
+    function getRange(data, from, to) {
+        
+        var fromIdx = _.sortedIndex(data, {t: from}, function(d) { return d.t; });
+        var toIdx = _.sortedIndex(data, {t: to}, function(d) { return d.t; });            
+
+        return data.slice(fromIdx, toIdx+1);
+    }
+
     function analyzeTacks(maneuvers, data) {
         var tacks = [];
 
@@ -225,26 +244,22 @@
                 var centerTime = moment(maneuvers[i].start);
 
                 if ( maneuvers[i-1].board == "PS" )
-                    return;
-                // if (i + 1 < maneuvers.length) {
-                //     var nextTime = moment(maneuvers[i + 1].start).subtract('seconds', 45);
-                //     if (nextTime < centerTime)
-                //         continue
-                // }
+                    continue;
 
-                var from = moment(maneuvers[i].start).subtract('seconds', 20);
-                var fromIdx = _.sortedIndex(data, {t: from}, function(d) { return d.t; });
+                if (i + 1 < maneuvers.length) {
+                    var nextTime = moment(maneuvers[i + 1].start).subtract(45, 'seconds');
+                    if (nextTime < centerTime)
+                        continue;
+                }
 
-                var to = moment(maneuvers[i].start).add('seconds', 120);
-                var toIdx = _.sortedIndex(data, {t: to}, function(d) { return d.t; });            
-
-                var range = data.slice(fromIdx, toIdx+1);
+                var range = getRangeX(data, maneuvers[i].start, 30, 120);
                 
 
                 var tack = {
                     time: centerTime,
                     board: maneuvers[i].board,
-                    timing: {}
+                    timing: {},
+                    data: getRangeX(data, maneuvers[i].start)
                 };
 
                 //process tack, by running steps in this order.
