@@ -1,7 +1,7 @@
 (function() {
     "use strict";
 
-    var R = '3440.06479'; //radius of earth in nautical miles
+    var R = 3440.06479; //radius of earth in nautical miles
 
     var deg = function deg(radians) {
         return (radians*180/Math.PI + 360) % 360;
@@ -11,16 +11,29 @@
         return degrees * Math.PI / 180;
     };
 
+    var lawOfCosines = function(a, b, gamma) {
+        return Math.sqrt(a * a + b * b - 2 * b * a * Math.cos(rad(Math.abs(gamma))));
+    };
+
     var calcs = {
         tws: function tws(speed, awa, aws) {
             //TODO: heel compensation
-            return Math.sqrt(speed * speed + aws * aws - 2 * aws * speed * Math.cos(rad(Math.abs(awa))));
+            return lawOfCosines(speed, aws, awa);
         },
 
         twa: function twa(speed, awa, tws) {
             var angle = deg(Math.asin(speed * Math.sin(rad(Math.abs(awa))) / tws)) + Math.abs(awa);
             if (awa < 0) angle *= -1;
             return angle;
+        },
+
+        gws: function gws(sog, awa, aws) {
+            return lawOfCosines(sog, aws, awa);
+        },
+
+        gwd: function gwd(sog, cog, awa, gws) {
+            var gwa = calcs.twa(sog, awa, gws);
+            return (cog + gwa + 360) % 360;
         },
 
         vmg: function vmg(speed, twa) {
@@ -80,18 +93,47 @@
             return Math.asin(Math.sin(d/R) * Math.sin(rad(b2-b1))) * R;
         },
 
-        set: function set(sog, cog) {
+        set: function set(speed, hdg, sog, cog) {
+            //GM: TODO: understand 90 deg offset.
+            //convert cog and hdg to radians, with north right
+            hdg = rad(90.0 - hdg);
+            cog = rad(90.0 - cog);
 
+            //break out x and y components of current vector
+            var current_x = sog * Math.cos(cog) - speed * Math.cos(hdg);
+            var current_y = sog * Math.sin(cog) - speed * Math.sin(hdg);
+
+            //set is the angle of the current vector (note we special case pure North or South)
+            var _set = 0;
+            if ( current_x === 0 ) {
+                _set = current_y < 0? 180: 0;
+            }
+            else {
+                //normalize 0 - 360
+                _set = (90.0 - deg(Math.atan2(current_y, current_x)) + 360) % 360;
+            }
+            return _set;
         },
 
-        drift: function drift(sog, cog) {
+        drift: function drift(speed, hdg, sog, cog) {
+            //GM: TODO: understand 90 deg offset.
+            //convert cog and hdg to radians, with north right
+            hdg = rad(90.0 - hdg);
+            cog = rad(90.0 - cog);
 
+            //break out x and y components of current vector
+            var current_x = sog * Math.cos(cog) - speed * Math.cos(hdg);
+            var current_y = sog * Math.sin(cog) - speed * Math.sin(hdg);
+
+            //drift is the magnitude of the current vector
+            var _drift = Math.sqrt(current_x * current_x + current_y * current_y);
+            return _drift;
         }
     };
 
     
     if (typeof exports != 'undefined') {
-        exports.Calcs = calcs;
+        exports.calcs = calcs;
     } else if (typeof module !== 'undefined' && module.exports) {
         module.exports = calcs;
     } else {
@@ -100,15 +142,18 @@
         }
         homegrown.calculations = calcs;
     }
-})();;(function() {
+})();
+;(function() {
     "use strict";
-    var _;
+    var _, moment;
 
     if ( typeof window != 'undefined' ) {
         _ = window._;
+        moment = window.moment;
     }
     else if( typeof require == 'function' ) {
         _ = require('lodash');
+        moment = require('moment');
     }
 
     //each of these functions takes a "tack" object, and 
@@ -141,21 +186,28 @@
                 }
             }
 
-            tack.timing.start = startIdx  || 15;
+            //TODO, default not idx based...
+            if ( startIdx )
+                tack.timing.start = startIdx;
+            else {
+                tack.timing.start = 15;
+                tack.notes.append('using default start');
+            }
             tack.startPosition = [data[tack.timing.start].lon, data[tack.timing.start].lat];
         },
 
-        calculateEntrySpeeds: function calculateEntrySpeeds(tack, data) {
+        calculateEntrySpeeds: function calculateEntrySpeeds(tack, tackData) {
             //then 5 seconds farther back to get starting vmg/speed
             //TODO: edge cases                
-            var startingIdx = Math.max(0, tack.timing.start-6);
-            var endingIdx = Math.min(data.length-2, tack.timing.start-2);
+            var startTime = moment(tackData[tack.timing.start].t).subtract(6, 'seconds');
+            var endTime = moment(tackData[tack.timing.start].t).subtract(2, 'seconds');
+            var data = getSliceBetweenTimes(tackData, startTime, endTime);
 
             var speedSum = 0, vmgSum = 0;
             var speedCount = 0, vmgCount = 0;
             var twaSum=0, twaCount = 0;
             var hdgSum=0, hdgCount = 0;
-            for (var j=startingIdx+1; j <= endingIdx; j++) {
+            for (var j=0; j < data.length; j++) {
                 if ( 'vmg' in data[j] ) {
                     vmgSum += data[j].vmg;
                     vmgCount++;
@@ -196,6 +248,7 @@
                     if (!('twa' in data[minIdx])) {
                         minIdx = j;
                     }
+
                     if (findMax) {
                         if (data[j].twa > data[minIdx].twa) {
                             minIdx = j;
@@ -273,8 +326,49 @@
 
             var ideal = tack.entryVmg * ((recovered - tack.timing.start) / 1000);
             tack.loss = - 6076.11549 / 3600.0 * (ideal - covered);
+        },
+
+        addClassificationStats: function addClassificationStats(tack, data) {
+            var twsSum = 0, twsCount = 0;
+            var twdSum = 0, twdCount = 0;
+
+            for (var j=0; j < tack.timing.start; j++) {
+                if ( 'tws' in data[j] ) {
+                    twsSum += data[j].tws;
+                    twsCount++;
+                }
+                if ( 'twd' in data[j] ) {
+                    twdSum += data[j].twd+360;
+                    twdCount++;
+                }
+            }
+
+            tack.tws = twsSum / twsCount;
+            tack.twd = (twdSum / twdCount) % 360;
         }
     };
+
+    /**
+     * Gets a subset of the data, around the time specified.
+     */
+    function getSliceAroundTime(data, time, before, after) {
+        var from = moment(time).subtract(before, 'seconds');
+        var to = moment(time).add(after, 'seconds');
+
+        return getSliceBetweenTimes(data, from, to);
+    }
+
+    /**
+     * Gets a subset of the data, between the times specified
+     */
+    function getSliceBetweenTimes(data, from, to) {
+        
+        var fromIdx = _.sortedIndex(data, {t: from}, function(d) { return d.t; });
+        var toIdx = _.sortedIndex(data, {t: to}, function(d) { return d.t; });            
+
+        return data.slice(fromIdx, toIdx+1);
+    }
+     
 
     function findManeuvers(data) {
         var maneuvers = [];
@@ -325,35 +419,34 @@
                 var centerTime = moment(maneuvers[i].start);
 
                 if ( maneuvers[i-1].board == "PS" )
-                    return;
-                // if (i + 1 < maneuvers.length) {
-                //     var nextTime = moment(maneuvers[i + 1].start).subtract('seconds', 45);
-                //     if (nextTime < centerTime)
-                //         continue
-                // }
+                    continue;
 
-                var from = moment(maneuvers[i].start).subtract('seconds', 20);
-                var fromIdx = _.sortedIndex(data, {t: from}, function(d) { return d.t; });
+                if (i + 1 < maneuvers.length) {
+                    var nextTime = moment(maneuvers[i + 1].start).subtract(45, 'seconds');
+                    if (nextTime < centerTime)
+                        continue;
+                }
 
-                var to = moment(maneuvers[i].start).add('seconds', 120);
-                var toIdx = _.sortedIndex(data, {t: to}, function(d) { return d.t; });            
-
-                var range = data.slice(fromIdx, toIdx+1);
+                var range = getSliceAroundTime(data, maneuvers[i].start, 30, 120);
                 
-
                 var tack = {
                     time: centerTime,
                     board: maneuvers[i].board,
-                    timing: {}
+                    timing: {},
+                    notes: [],
+                    data: getSliceAroundTime(data, maneuvers[i].start, 20, 40),
+                    track: getSliceAroundTime(data, maneuvers[i].start, 15, 20),
                 };
-
+                
                 //process tack, by running steps in this order.
                 tackUtils.findCenter(tack, range);
                 tackUtils.findStart(tack, range);
                 tackUtils.calculateEntrySpeeds(tack, range);
                 tackUtils.findEnd(tack, range);
+                
                 tackUtils.findRecoveryTime(tack, range);
                 tackUtils.findRecoveryMetrics(tack, range);
+                tackUtils.addClassificationStats(tack, range);
 
                 tackUtils.convertIndexesToTimes(tack, range);
                 tackUtils.calculateLoss(tack, range);
@@ -368,13 +461,15 @@
 
     var maneuverUtilities = {
         findManeuvers: findManeuvers,
-        analyzeTacks: analyzeTacks
+        analyzeTacks: analyzeTacks,
+        getSliceAroundTime: getSliceAroundTime,
+        getSliceBetweenTimes: getSliceBetweenTimes
     };
 
     if (typeof exports != 'undefined') {
-        exports.Maneuvers = maneuverUtilities;
+        exports.maneuvers = maneuverUtilities;
     } else if (typeof module != 'undefined' && module.exports) {
-        module.exports.Maneuvers = maneuverUtilities;
+        module.exports.maneuvers = maneuverUtilities;
     } else {
         if ( typeof homegrown == 'undefined' ) {
             window.homegrown = {};
@@ -439,6 +534,32 @@
                 return result;
             };
         },
+        average: function average(name, metric, size) {
+            var rolling = 0;
+            var counter = 0;
+            var windowX = [];
+
+            return function(args) {
+                var result = null;
+
+                if (metric in args) {
+                    var pos = counter % size;
+                    counter++;
+
+                    if (windowX[pos]) {
+                        rolling -= windowX[pos];
+                    }
+                    rolling += args[metric];
+                    windowX[pos] = args[metric];
+
+                    result = {};
+                    result[name] = rolling / windowX.length;
+                }
+
+                return result;
+            };
+        },
+
         /**
          * Wraps function to allow it to handle streaming inputs.  
          * @param funct - the name of the function will be used to name the return value.  
@@ -452,12 +573,12 @@
             var runningArgs = [];
 
             return function(args) {
-                var presentValues = _.map(argumentNames, function(name) { return args[name]; });
+                // var presentValues = _.map(argumentNames, function(name) { return args[name]; });
 
                 var allSet = true;
                 for( var i=0; i < argumentNames.length; i++ ) {
-                    if ( presentValues[i] ) {
-                        runningArgs[i] = presentValues[i];
+                    if ( argumentNames[i] in args ) {
+                        runningArgs[i] = args[argumentNames[i]];
                     }
 
                     if ( !runningArgs[i] ) {
@@ -480,9 +601,9 @@
     };
 
     if (typeof exports != 'undefined') {
-        exports.Utilities = utilities;
+        exports.utilities = utilities;
     } else if (typeof module !== 'undefined' && module.exports) {
-        module.exports.Utilities = utilities;
+        module.exports.utilities = utilities;
     } else {
         if ( typeof homegrown == 'undefined' ) {
             window.homegrown = {};
