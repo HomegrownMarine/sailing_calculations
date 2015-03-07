@@ -1,7 +1,7 @@
 (function() {
     "use strict";
 
-    var R = '3440.06479'; //radius of earth in nautical miles
+    var R = 3440.06479; //radius of earth in nautical miles
 
     var deg = function deg(radians) {
         return (radians*180/Math.PI + 360) % 360;

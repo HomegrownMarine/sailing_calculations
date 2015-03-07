@@ -41,22 +41,28 @@
                 }
             }
 
-            //TODO, default not idx based... alarm on had to use default
-            tack.timing.start = startIdx  || 15;
+            //TODO, default not idx based...
+            if ( startIdx )
+                tack.timing.start = startIdx;
+            else {
+                tack.timing.start = 15;
+                tack.notes.append('using default start');
+            }
             tack.startPosition = [data[tack.timing.start].lon, data[tack.timing.start].lat];
         },
 
-        calculateEntrySpeeds: function calculateEntrySpeeds(tack, data) {
+        calculateEntrySpeeds: function calculateEntrySpeeds(tack, tackData) {
             //then 5 seconds farther back to get starting vmg/speed
             //TODO: edge cases                
-            var startingIdx = Math.max(0, tack.timing.start-6);
-            var endingIdx = Math.min(data.length-2, tack.timing.start-2);
+            var startTime = moment(tackData[tack.timing.start].t).subtract(6, 'seconds');
+            var endTime = moment(tackData[tack.timing.start].t).subtract(2, 'seconds');
+            var data = getSliceBetweenTimes(tackData, startTime, endTime);
 
             var speedSum = 0, vmgSum = 0;
             var speedCount = 0, vmgCount = 0;
             var twaSum=0, twaCount = 0;
             var hdgSum=0, hdgCount = 0;
-            for (var j=startingIdx+1; j <= endingIdx; j++) {
+            for (var j=0; j < data.length; j++) {
                 if ( 'vmg' in data[j] ) {
                     vmgSum += data[j].vmg;
                     vmgCount++;
@@ -175,8 +181,49 @@
 
             var ideal = tack.entryVmg * ((recovered - tack.timing.start) / 1000);
             tack.loss = - 6076.11549 / 3600.0 * (ideal - covered);
+        },
+
+        addClassificationStats: function addClassificationStats(tack, data) {
+            var twsSum = 0, twsCount = 0;
+            var twdSum = 0, twdCount = 0;
+
+            for (var j=0; j < tack.timing.start; j++) {
+                if ( 'tws' in data[j] ) {
+                    twsSum += data[j].tws;
+                    twsCount++;
+                }
+                if ( 'twd' in data[j] ) {
+                    twdSum += data[j].twd+360;
+                    twdCount++;
+                }
+            }
+
+            tack.tws = twsSum / twsCount;
+            tack.twd = (twdSum / twdCount) % 360;
         }
     };
+
+    /**
+     * Gets a subset of the data, around the time specified.
+     */
+    function getSliceAroundTime(data, time, before, after) {
+        var from = moment(time).subtract(before, 'seconds');
+        var to = moment(time).add(after, 'seconds');
+
+        return getSliceBetweenTimes(data, from, to);
+    }
+
+    /**
+     * Gets a subset of the data, between the times specified
+     */
+    function getSliceBetweenTimes(data, from, to) {
+        
+        var fromIdx = _.sortedIndex(data, {t: from}, function(d) { return d.t; });
+        var toIdx = _.sortedIndex(data, {t: to}, function(d) { return d.t; });            
+
+        return data.slice(fromIdx, toIdx+1);
+    }
+     
 
     function findManeuvers(data) {
         var maneuvers = [];
@@ -216,23 +263,6 @@
         return maneuvers;
     }
 
-    function getRangeX(data, time, timeBefore, timeAfter) {
-        if ( timeBefore === undefined ) timeBefore = 30;
-        if ( timeAfter === undefined ) timeAfter = 45;
-        var from = moment(time).subtract(timeBefore, 'seconds');
-        var to = moment(time).add(timeAfter, 'seconds');
-
-        return getRange(data, from, to);
-    }
-
-    function getRange(data, from, to) {
-        
-        var fromIdx = _.sortedIndex(data, {t: from}, function(d) { return d.t; });
-        var toIdx = _.sortedIndex(data, {t: to}, function(d) { return d.t; });            
-
-        return data.slice(fromIdx, toIdx+1);
-    }
-
     function analyzeTacks(maneuvers, data) {
         var tacks = [];
 
@@ -252,23 +282,26 @@
                         continue;
                 }
 
-                var range = getRangeX(data, maneuvers[i].start, 30, 120);
+                var range = getSliceAroundTime(data, maneuvers[i].start, 30, 120);
                 
-
                 var tack = {
                     time: centerTime,
                     board: maneuvers[i].board,
                     timing: {},
-                    data: getRangeX(data, maneuvers[i].start)
+                    notes: [],
+                    data: getSliceAroundTime(data, maneuvers[i].start, 20, 40),
+                    track: getSliceAroundTime(data, maneuvers[i].start, 15, 20),
                 };
-
+                
                 //process tack, by running steps in this order.
                 tackUtils.findCenter(tack, range);
                 tackUtils.findStart(tack, range);
                 tackUtils.calculateEntrySpeeds(tack, range);
                 tackUtils.findEnd(tack, range);
+                
                 tackUtils.findRecoveryTime(tack, range);
                 tackUtils.findRecoveryMetrics(tack, range);
+                tackUtils.addClassificationStats(tack, range);
 
                 tackUtils.convertIndexesToTimes(tack, range);
                 tackUtils.calculateLoss(tack, range);
@@ -283,7 +316,9 @@
 
     var maneuverUtilities = {
         findManeuvers: findManeuvers,
-        analyzeTacks: analyzeTacks
+        analyzeTacks: analyzeTacks,
+        getSliceAroundTime: getSliceAroundTime,
+        getSliceBetweenTimes: getSliceBetweenTimes
     };
 
     if (typeof exports != 'undefined') {
