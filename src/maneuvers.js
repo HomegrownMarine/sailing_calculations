@@ -1,14 +1,16 @@
 (function() {
     "use strict";
-    var _, moment;
+    var _, moment, circularMean;
 
     if ( typeof window != 'undefined' ) {
         _ = window._;
         moment = window.moment;
+        circularMean = homegrown.calculations.circularMean;
     }
     else if( typeof require == 'function' ) {
         _ = require('lodash');
         moment = require('moment');
+        //circularMean = //TODO
     }
 
     //each of these functions takes a "tack" object, and 
@@ -61,7 +63,7 @@
             var speedSum = 0, vmgSum = 0;
             var speedCount = 0, vmgCount = 0;
             var twaSum=0, twaCount = 0;
-            var hdgSum=0, hdgCount = 0;
+            var hdgs = [];
             for (var j=0; j < data.length; j++) {
                 if ( 'vmg' in data[j] ) {
                     vmgSum += data[j].vmg;
@@ -76,15 +78,14 @@
                     twaCount++;
                 }
                 if ( 'hdg' in data[j] ) {
-                    hdgSum += data[j].hdg+360;
-                    hdgCount++;
+                    hdgs.push( data[j].hdg );
                 }
             }
 
             tack.entryVmg = vmgSum / vmgCount;
             tack.entrySpeed = speedSum / speedCount;
             tack.entryTwa = twaSum / twaCount;
-            tack.entryHdg = (hdgSum / hdgCount) % 360;
+            tack.entryHdg = circularMean(hdgs);
         },
 
         findEnd: function findEnd(tack, data) {
@@ -139,7 +140,7 @@
             //and find recovery speed and angles
             
             var twaSum=0, twaCount = 0;
-            var hdgSum=0, hdgCount = 0;
+            var hdgs = [];
 
             var maxIdx = Math.min(tack.timing.recovered+6, data.length);
             for (var j=tack.timing.recovered; j < maxIdx; j++) {
@@ -148,13 +149,12 @@
                     twaCount++;
                 }
                 if ( 'hdg' in data[j] ) {
-                    hdgSum += data[j].hdg+360;
-                    hdgCount++;
+                    hdgs.push( data[j].hdg );
                 }
             }
 
             tack.recoveryTwa = twaSum / twaCount;
-            tack.recoveryHdg = (hdgSum / hdgCount) % 360;
+            tack.recoveryHdg = circularMean(hdgs);
         },
 
         convertIndexesToTimes: function convertIndexesToTimes(tack, data) {
@@ -185,7 +185,7 @@
 
         addClassificationStats: function addClassificationStats(tack, data) {
             var twsSum = 0, twsCount = 0;
-            var twdSum = 0, twdCount = 0;
+            var twds = [];
 
             for (var j=0; j < tack.timing.start; j++) {
                 if ( 'tws' in data[j] ) {
@@ -193,13 +193,12 @@
                     twsCount++;
                 }
                 if ( 'twd' in data[j] ) {
-                    twdSum += data[j].twd+360;
-                    twdCount++;
+                    twds.push(data[j].twd);
                 }
             }
 
             tack.tws = twsSum / twsCount;
-            tack.twd = (twdSum / twdCount) % 360;
+            tack.twd = circularMean(twds);
         }
     };
 

@@ -119,6 +119,65 @@
 
                 return null;
             };
+        },
+
+        /*
+            Pass in a data array, where each element has a time, t and a set of segments,
+            each with a start and end time, and get back a new segment array, with each having
+            a data array for points within the segments start and end time.
+        */
+        segmentData: function segmentData(data, segments) {
+            var segs = _.clone(segments, true);
+            _.each(segs, function(seg) {
+                seg.data = [];
+            });
+
+            var j = 0;
+            for ( var i=0; i < data.length; i++ ) {
+                if ( data[i].t < segs[j].start ) {
+                    continue;
+                }
+                else if ( data[i].t < segs[j].end ) {
+                    segs[j].data.push(data[i]);
+                }
+                else {
+                    j++;
+                    if (j >= segs.length) 
+                        break;
+                    segs[j].data.push(data[i]);
+                }
+            }
+
+            return segs;
+        },
+
+        summerizeData: function summerizeData(data, field, timeStep) {
+            timeStep = timeStep || 10000; //default 10 seconds
+
+            var segments = [];
+            var sum=0, count=0;
+            var startTime = data[0].t;
+            
+            for (var i=0; i < data.length; i++) {
+                if (data[i].t > startTime + timeStep) {
+                    var seg = {
+                        start: startTime,
+                        end: data[i].t
+                    };
+                    seg[field] = sum/count;
+                    segments.push(seg);
+
+                    sum = 0; count = 0;
+                    startTime = data[i].t;
+                }
+
+                if ( field in data[i] ) {
+                    sum += data[i][field];
+                    count++;
+                }
+            }
+
+            return segments;
         }
     };
 
