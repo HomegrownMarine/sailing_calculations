@@ -215,8 +215,7 @@
     /**
      * Gets a subset of the data, between the times specified
      */
-    function getSliceBetweenTimes(data, from, to) {
-        
+    function getSliceBetweenTimes(data, from, to) {      
         var fromIdx = _.sortedIndex(data, {t: from}, function(d) { return d.t; });
         var toIdx = _.sortedIndex(data, {t: to}, function(d) { return d.t; });            
 
@@ -225,41 +224,46 @@
      
 
     function findManeuvers(data) {
-        var maneuvers = [];
-
-        //fimd maneuvers
-        var lastBoard = null;
-        var lastBoardStart = data[0].t;
-        for (var i = 0; i < data.length; i++) {
-            if ( 'twa' in data[i] ) {
-                var board = 'U-S';
-                if (-90 <= data[i].twa && data[i].twa < 0)
+        function getBoard(point) {
+            var board = null;
+            if ( 'twa' in point ) {
+                board = 'U-S';
+                if (-90 <= point.twa && point.twa < 0)
                     board = 'U-P';
-                else if (data[i].twa < -90)
+                else if (point.twa < -90)
                     board = 'D-P';
-                else if (data[i].twa > 90)
+                else if (point.twa > 90)
                     board = 'D-S';
 
-                if (data[i].ot < 300) {
+                if (point.ot < 300) {
                     board = "PS";
                 }
-
-                if (lastBoard != board) {
-                    if ( lastBoard !== null ) {
-                        maneuvers.push({
-                            board: lastBoard,
-                            start: lastBoardStart,
-                            end: data[i].t
-                        });
-                    }
-                    lastBoard = board;
-                    lastBoardStart = data[i].t;
-                }
-
             }
+            return board;
         }
 
-        return maneuvers;
+        return _.map(homegrown.streamingUtilities.createChangeDataSegments(data, getBoard), function(b) {
+            b.board = b.value;
+            return b;
+        });
+    }
+
+    function findLegs(data) {
+        function getLeg(point) {
+            var leg = null;
+            if (point.ot < 300) {
+                leg = "PS";
+            }
+            else if ('twa' in point) {
+                if (Math.abs(point.twa) < 90)
+                    leg = 'Upwind';
+                else 
+                    leg = 'Downwind';
+            }
+            return leg;
+        }
+
+        return homegrown.streamingUtilities.createChangeDataSegments(data, getLeg);
     }
 
     function analyzeTacks(maneuvers, data) {

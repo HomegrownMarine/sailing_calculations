@@ -1,5 +1,247 @@
 (function() {
     "use strict";
+    var _;
+
+    if ( typeof window != 'undefined' ) {
+        _ = window._;
+    }
+    else if ( typeof require == 'function' ) {
+        _ = require('lodash');
+    }
+
+    //from stack overflow
+    var remove_comments_regex = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
+    var argument_names_regex = /([^\s,]+)/g;
+    function getParamNames(funct) {
+      var fnStr = funct.toString().replace(remove_comments_regex, '');
+      var result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(argument_names_regex);
+      if ( result === null )
+         result = [];
+      return result;
+    }
+
+    var utilities = {
+        /**
+         * given a metric, will compute it's derivitive.
+         * @param name - the name of the derivitive
+         * @param metric - the name of the metric to calculate the derivitive from
+         * @param [scaleFactor] - optional conversion factor, if the new metric should
+         *                        be in different units.
+         * @return 
+
+         * Example: var acceleration = derivitive('acceleration', 'speed');
+         * assert acceleration({'speed': 5, 't':1000}) == null //first execution
+         * assert acceleration({'speed': 5, 't':1000}) == {'acceleration': 0}
+         * assert acceleration({'speed': 6, 't':1000}) == {'acceleration': 1}
+         */
+        derivitive: function derivitive(name, metric, scaleFactor) {
+            scaleFactor = scaleFactor || 1;
+            var lastValue = null, lastTime;
+
+            return function(args) {
+                var result = null;
+
+                if (metric in args) {
+                    if (lastValue !== null) {
+                        var delta = (args[metric] - lastValue) / ((args.t - lastTime)/1000) * scaleFactor;
+
+                        result = {};
+                        result[name] = delta;
+                    }
+
+                    lastValue = args[metric];
+                    lastTime = args.t;
+                }
+
+                return result;
+            };
+        },
+        average: function average(name, metric, size) {
+            var rolling = 0;
+            var counter = 0;
+            var windowX = [];
+
+            return function(args) {
+                var result = null;
+
+                if (metric in args) {
+                    var pos = counter % size;
+                    counter++;
+
+                    if (windowX[pos]) {
+                        rolling -= windowX[pos];
+                    }
+                    rolling += args[metric];
+                    windowX[pos] = args[metric];
+
+                    result = {};
+                    result[name] = rolling / windowX.length;
+                }
+
+                return result;
+            };
+        },
+
+        /**
+         * Wraps function to allow it to handle streaming inputs.  
+         * @param funct - the name of the function will be used to name the return value.  
+         *                The name of the arguments will be used to pull the arguments out 
+         *                of maps of possible arguments.
+         * @return {object} - will return null if all of the arguments aren't avaible to execute the
+         *                    function, or an object of the form: {function_name: result}.
+         */
+        delayedInputs: function delayedInputs(funct) {
+            var argumentNames = getParamNames(funct);
+            var runningArgs = [];
+
+            return function(args) {
+                // var presentValues = _.map(argumentNames, function(name) { return args[name]; });
+
+                var allSet = true;
+                for( var i=0; i < argumentNames.length; i++ ) {
+                    if ( argumentNames[i] in args ) {
+                        runningArgs[i] = args[argumentNames[i]];
+                    }
+
+                    if ( !runningArgs[i] ) {
+                        allSet = false;
+                    }
+                }
+
+                //if all 
+                if (allSet) {
+                    var result = funct.apply(this, runningArgs);
+                    runningArgs = [];
+                    var obj = {};
+                    obj[funct.name] = result;
+                    return obj;
+                }
+
+                return null;
+            };
+        },
+
+        /*
+            Pass in a data array, where each element has a time, t and a set of segments,
+            each with a start and end time, and get back a new segment array, with each having
+            a data array for points within the segments start and end time.
+        */
+        segmentData: function segmentData(data, segments) {
+            var segs = _.clone(segments, true);
+            _.each(segs, function(seg) {
+                seg.data = [];
+            });
+
+            var j = 0;
+            for ( var i=0; i < data.length; i++ ) {
+                if ( data[i].t < segs[j].start ) {
+                    continue;
+                }
+                else if ( data[i].t < segs[j].end ) {
+                    segs[j].data.push(data[i]);
+                }
+                else {
+                    j++;
+                    if (j >= segs.length) 
+                        break;
+                    segs[j].data.push(data[i]);
+                }
+            }
+
+            return segs;
+        },
+
+        //untested: create a new segment whenever 
+        createChangeDataSegments: function createSegments(data, field) {
+            
+            var segments = [];
+            var lastValue = null;
+            var startTime = null;
+
+            //get points from data
+            var getValue;
+            if (typeof field == 'function')
+                getValue = field;
+            else {
+                getValue = function getValue(point) {
+                    if (field in point)
+                        return point[field];
+                    else 
+                        return null;
+                };
+            }
+
+            var i=0;
+            for (; i < data.length; i++) {
+                var value = getValue(data[i]);
+                if ( value ) {
+                    lastValue = value;
+                    startTime = data[i].t;
+                    break;
+                }
+            }
+            
+            for (; i < data.length; i++) {
+                var newValue = getValue(data[i]);
+
+                if ( newValue && newValue != lastValue ) {
+                    var seg = {
+                        value: lastValue,
+                        start: startTime,
+                        end: data[i].t
+                    };
+                    segments.push(seg);
+
+                    lastValue = newValue;
+                    startTime = data[i].t;
+                }
+            }
+
+            return segments;
+        },
+
+        createSummaryDataSegments: function summerizeData(data, field, timeStep) {
+            timeStep = timeStep || 10000; //default 10 seconds
+
+            var segments = [];
+            var sum=0, count=0;
+            var startTime = data[0].t;
+            
+            for (var i=0; i < data.length; i++) {
+                if (data[i].t > startTime + timeStep) {
+                    var seg = {
+                        start: startTime,
+                        end: data[i].t
+                    };
+                    seg[field] = sum/count;
+                    segments.push(seg);
+
+                    sum = 0; count = 0;
+                    startTime = data[i].t;
+                }
+
+                if ( field in data[i] ) {
+                    sum += data[i][field];
+                    count++;
+                }
+            }
+
+            return segments;
+        }
+    };
+
+    if (typeof exports != 'undefined') {
+        exports.utilities = utilities;
+    } else if (typeof module !== 'undefined' && module.exports) {
+        module.exports.utilities = utilities;
+    } else {
+        if ( typeof homegrown == 'undefined' ) {
+            window.homegrown = {};
+        }
+        homegrown.streamingUtilities = utilities;
+    }
+})();;(function() {
+    "use strict";
 
     var R = 3440.06479; //radius of earth in nautical miles
 
@@ -128,6 +370,16 @@
             //drift is the magnitude of the current vector
             var _drift = Math.sqrt(current_x * current_x + current_y * current_y);
             return _drift;
+        },
+
+        circularMean: function circularMean(dat) {
+            var sinComp = 0, cosComp = 0;
+            _.each(dat, function(angle) {
+                sinComp += Math.sin(rad(angle));
+                cosComp += Math.cos(rad(angle));
+            });
+
+            return (360+deg(Math.atan2(sinComp/dat.length, cosComp/dat.length)))%360;
         }
     };
 
@@ -145,35 +397,17 @@
 })();
 ;(function() {
     "use strict";
-    var _, moment;
+    var _, moment, circularMean;
 
     if ( typeof window != 'undefined' ) {
         _ = window._;
         moment = window.moment;
+        circularMean = homegrown.calculations.circularMean;
     }
     else if( typeof require == 'function' ) {
         _ = require('lodash');
         moment = require('moment');
-    }
-
-   var deg = function deg(radians) {
-        return (radians*180/Math.PI + 360) % 360;
-    };
-
-    var rad = function rad(degrees) {
-        return degrees * Math.PI / 180;
-    };
-
- 
-
-    function circularMean(dat) {
-        var sinComp = 0, cosComp = 0;
-        _.each(dat, function(angle) {
-            sinComp += Math.sin(rad(angle));
-            cosComp += Math.cos(rad(angle));
-        });
-
-        return (360+deg(Math.atan2(sinComp/dat.length, cosComp/dat.length)))%360;
+        //circularMean = //TODO
     }
 
     //each of these functions takes a "tack" object, and 
@@ -378,8 +612,7 @@
     /**
      * Gets a subset of the data, between the times specified
      */
-    function getSliceBetweenTimes(data, from, to) {
-        
+    function getSliceBetweenTimes(data, from, to) {      
         var fromIdx = _.sortedIndex(data, {t: from}, function(d) { return d.t; });
         var toIdx = _.sortedIndex(data, {t: to}, function(d) { return d.t; });            
 
@@ -388,41 +621,46 @@
      
 
     function findManeuvers(data) {
-        var maneuvers = [];
-
-        //fimd maneuvers
-        var lastBoard = null;
-        var lastBoardStart = data[0].t;
-        for (var i = 0; i < data.length; i++) {
-            if ( 'twa' in data[i] ) {
-                var board = 'U-S';
-                if (-90 <= data[i].twa && data[i].twa < 0)
+        function getBoard(point) {
+            var board = null;
+            if ( 'twa' in point ) {
+                board = 'U-S';
+                if (-90 <= point.twa && point.twa < 0)
                     board = 'U-P';
-                else if (data[i].twa < -90)
+                else if (point.twa < -90)
                     board = 'D-P';
-                else if (data[i].twa > 90)
+                else if (point.twa > 90)
                     board = 'D-S';
 
-                if (data[i].ot < 300) {
+                if (point.ot < 300) {
                     board = "PS";
                 }
-
-                if (lastBoard != board) {
-                    if ( lastBoard !== null ) {
-                        maneuvers.push({
-                            board: lastBoard,
-                            start: lastBoardStart,
-                            end: data[i].t
-                        });
-                    }
-                    lastBoard = board;
-                    lastBoardStart = data[i].t;
-                }
-
             }
+            return board;
         }
 
-        return maneuvers;
+        return _.map(homegrown.streamingUtilities.createChangeDataSegments(data, getBoard), function(b) {
+            b.board = b.value;
+            return b;
+        });
+    }
+
+    function findLegs(data) {
+        function getLeg(point) {
+            var leg = null;
+            if (point.ot < 300) {
+                leg = "PS";
+            }
+            else if ('twa' in point) {
+                if (Math.abs(point.twa) < 90)
+                    leg = 'Upwind';
+                else 
+                    leg = 'Downwind';
+            }
+            return leg;
+        }
+
+        return homegrown.streamingUtilities.createChangeDataSegments(data, getLeg);
     }
 
     function analyzeTacks(maneuvers, data) {
@@ -492,139 +730,5 @@
             window.homegrown = {};
         }
         homegrown.maneuvers = maneuverUtilities;
-    }
-})();;(function() {
-    "use strict";
-    var _;
-
-    if ( typeof window != 'undefined' ) {
-        _ = window._;
-    }
-    else if ( typeof require == 'function' ) {
-        _ = require('lodash');
-    }
-
-    //from stack overflow
-    var remove_comments_regex = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
-    var argument_names_regex = /([^\s,]+)/g;
-    function getParamNames(funct) {
-      var fnStr = funct.toString().replace(remove_comments_regex, '');
-      var result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(argument_names_regex);
-      if ( result === null )
-         result = [];
-      return result;
-    }
-
-    var utilities = {
-        /**
-         * given a metric, will compute it's derivitive.
-         * @param name - the name of the derivitive
-         * @param metric - the name of the metric to calculate the derivitive from
-         * @param [scaleFactor] - optional conversion factor, if the new metric should
-         *                        be in different units.
-         * @return 
-
-         * Example: var acceleration = derivitive('acceleration', 'speed');
-         * assert acceleration({'speed': 5, 't':1000}) == null //first execution
-         * assert acceleration({'speed': 5, 't':1000}) == {'acceleration': 0}
-         * assert acceleration({'speed': 6, 't':1000}) == {'acceleration': 1}
-         */
-        derivitive: function derivitive(name, metric, scaleFactor) {
-            scaleFactor = scaleFactor || 1;
-            var lastValue = null, lastTime;
-
-            return function(args) {
-                var result = null;
-
-                if (metric in args) {
-                    if (lastValue !== null) {
-                        var delta = (args[metric] - lastValue) / ((args.t - lastTime)/1000) * scaleFactor;
-
-                        result = {};
-                        result[name] = delta;
-                    }
-
-                    lastValue = args[metric];
-                    lastTime = args.t;
-                }
-
-                return result;
-            };
-        },
-        average: function average(name, metric, size) {
-            var rolling = 0;
-            var counter = 0;
-            var windowX = [];
-
-            return function(args) {
-                var result = null;
-
-                if (metric in args) {
-                    var pos = counter % size;
-                    counter++;
-
-                    if (windowX[pos]) {
-                        rolling -= windowX[pos];
-                    }
-                    rolling += args[metric];
-                    windowX[pos] = args[metric];
-
-                    result = {};
-                    result[name] = rolling / windowX.length;
-                }
-
-                return result;
-            };
-        },
-
-        /**
-         * Wraps function to allow it to handle streaming inputs.  
-         * @param funct - the name of the function will be used to name the return value.  
-         *                The name of the arguments will be used to pull the arguments out 
-         *                of maps of possible arguments.
-         * @return {object} - will return null if all of the arguments aren't avaible to execute the
-         *                    function, or an object of the form: {function_name: result}.
-         */
-        delayedInputs: function delayedInputs(funct) {
-            var argumentNames = getParamNames(funct);
-            var runningArgs = [];
-
-            return function(args) {
-                // var presentValues = _.map(argumentNames, function(name) { return args[name]; });
-
-                var allSet = true;
-                for( var i=0; i < argumentNames.length; i++ ) {
-                    if ( argumentNames[i] in args ) {
-                        runningArgs[i] = args[argumentNames[i]];
-                    }
-
-                    if ( !runningArgs[i] ) {
-                        allSet = false;
-                    }
-                }
-
-                //if all 
-                if (allSet) {
-                    var result = funct.apply(this, runningArgs);
-                    runningArgs = [];
-                    var obj = {};
-                    obj[funct.name] = result;
-                    return obj;
-                }
-
-                return null;
-            };
-        }
-    };
-
-    if (typeof exports != 'undefined') {
-        exports.utilities = utilities;
-    } else if (typeof module !== 'undefined' && module.exports) {
-        module.exports.utilities = utilities;
-    } else {
-        if ( typeof homegrown == 'undefined' ) {
-            window.homegrown = {};
-        }
-        homegrown.streamingUtilities = utilities;
     }
 })();

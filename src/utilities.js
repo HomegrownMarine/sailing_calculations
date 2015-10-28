@@ -151,7 +151,56 @@
             return segs;
         },
 
-        summerizeData: function summerizeData(data, field, timeStep) {
+        //untested: create a new segment whenever 
+        createChangeDataSegments: function createSegments(data, field) {
+            
+            var segments = [];
+            var lastValue = null;
+            var startTime = null;
+
+            //get points from data
+            var getValue;
+            if (typeof field == 'function')
+                getValue = field;
+            else {
+                getValue = function getValue(point) {
+                    if (field in point)
+                        return point[field];
+                    else 
+                        return null;
+                };
+            }
+
+            var i=0;
+            for (; i < data.length; i++) {
+                var value = getValue(data[i]);
+                if ( value ) {
+                    lastValue = value;
+                    startTime = data[i].t;
+                    break;
+                }
+            }
+            
+            for (; i < data.length; i++) {
+                var newValue = getValue(data[i]);
+
+                if ( newValue && newValue != lastValue ) {
+                    var seg = {
+                        value: lastValue,
+                        start: startTime,
+                        end: data[i].t
+                    };
+                    segments.push(seg);
+
+                    lastValue = newValue;
+                    startTime = data[i].t;
+                }
+            }
+
+            return segments;
+        },
+
+        createSummaryDataSegments: function summerizeData(data, field, timeStep) {
             timeStep = timeStep || 10000; //default 10 seconds
 
             var segments = [];
