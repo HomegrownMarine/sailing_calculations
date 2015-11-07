@@ -159,9 +159,11 @@
             var startTime = null;
 
             //get points from data
-            var getValue;
-            if (typeof field == 'function')
+            var getValue, fieldName;
+            if (typeof field == 'function') {
                 getValue = field;
+                fieldName = field.name;
+            }
             else {
                 getValue = function getValue(point) {
                     if (field in point)
@@ -169,6 +171,7 @@
                     else 
                         return null;
                 };
+                fieldName = field;
             }
 
             var i=0;
@@ -186,10 +189,11 @@
 
                 if ( newValue && newValue != lastValue ) {
                     var seg = {
-                        value: lastValue,
+                        // value: lastValue,
                         start: startTime,
                         end: data[i].t
                     };
+                    seg[fieldName] = lastValue;
                     segments.push(seg);
 
                     lastValue = newValue;

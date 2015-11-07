@@ -13,6 +13,21 @@
         //circularMean = //TODO
     }
 
+    function mean() {
+        var sum = 0, count = 0;
+
+        return {
+            update: function(p) {
+                count++;
+                sum += p;
+            },
+            result: function() {
+                if ( count ) 
+                    return sum / count;
+            }
+        };
+    }
+
     //each of these functions takes a "tack" object, and 
     //a section of data around the tack and adds some specific
     //metric(s) to the tack
@@ -48,7 +63,7 @@
                 tack.timing.start = startIdx;
             else {
                 tack.timing.start = 15;
-                tack.notes.append('using default start');
+                tack.notes.push('using default start');
             }
             tack.startPosition = [data[tack.timing.start].lon, data[tack.timing.start].lat];
         },
@@ -63,29 +78,59 @@
             var speedSum = 0, vmgSum = 0;
             var speedCount = 0, vmgCount = 0;
             var twaSum=0, twaCount = 0;
+
+            var averageSpeed = mean();
+            var averageTwa = mean();
+            var averageVmg = mean();
+
+            var averageTargetTwa = mean();
+
+            var averageTgtSpd = mean();
             var hdgs = [];
             for (var j=0; j < data.length; j++) {
                 if ( 'vmg' in data[j] ) {
-                    vmgSum += data[j].vmg;
-                    vmgCount++;
+                    averageVmg.update( data[j].vmg );
                 }
                 if ( 'speed' in data[j] ) {
-                    speedSum += data[j].speed;
-                    speedCount++;
+                    averageSpeed.update( data[j].speed );
                 }
                 if ( 'twa' in data[j] ) {
-                    twaSum += data[j].twa;
-                    twaCount++;
+                    averageTwa.update( data[j].twa );
+                }
+                if ( 'targetSpeed' in data[j] ) {
+                    averageTgtSpd.update( data[j].targetSpeed );
                 }
                 if ( 'hdg' in data[j] ) {
                     hdgs.push( data[j].hdg );
                 }
+                if ( 'targetAngle' in data[j] ) {
+                    averageTargetTwa.update( data[j].targetAngle );
+                }            
             }
 
-            tack.entryVmg = vmgSum / vmgCount;
-            tack.entrySpeed = speedSum / speedCount;
-            tack.entryTwa = twaSum / twaCount;
+            tack.entryVmg = averageVmg.result();
+            tack.entrySpeed = averageSpeed.result();
+            tack.entryTwa = averageTwa.result();
             tack.entryHdg = circularMean(hdgs);
+
+            var targetSpeed = averageTgtSpd.result();
+
+            if (targetSpeed) {
+                tack.targetSpeed = targetSpeed;
+                if (tack.entrySpeed < targetSpeed * 0.9) {
+                    tack.notes.push('* started tack downspeed');
+                }
+            }
+
+            var targetAngle = averageTargetTwa.result();
+            console.info('werid', targetAngle);
+            if (targetAngle) {
+                tack.targetAngle = targetAngle;
+                // if (tack.entrySpeed < targetSpeed * 0.9) {
+                //     tack.notes.push('* started tack downspeed');
+                // }
+            }
+
         },
 
         findEnd: function findEnd(tack, data) {
@@ -133,28 +178,40 @@
             }
 
             //TODO: find better fallback
-            tack.timing.recovered = tack.timing.recovered || (tack.timing.center+30);
+            if ( !tack.timing.recovered ) {
+                tack.timing.recovered = (tack.timing.center+30);
+                tack.notes.push('never found recovery');
+            }
         },
 
         findRecoveryMetrics: function findRecoveryMetrics(tack, data) {
             //and find recovery speed and angles
             
-            var twaSum=0, twaCount = 0;
             var hdgs = [];
+            var averageSpeed = mean();
+            var averageTwa = mean();
 
             var maxIdx = Math.min(tack.timing.recovered+6, data.length);
             for (var j=tack.timing.recovered; j < maxIdx; j++) {
                 if ( 'twa' in data[j] ) {
-                    twaSum += data[j].twa;
-                    twaCount++;
+                    averageTwa.update( data[j].twa );
                 }
                 if ( 'hdg' in data[j] ) {
                     hdgs.push( data[j].hdg );
                 }
+                if ( 'speed' in data[j] ) {
+                    averageSpeed.update( data[j].speed );
+                }
             }
 
-            tack.recoveryTwa = twaSum / twaCount;
+            tack.recoveryTwa = averageTwa.result();
             tack.recoveryHdg = circularMean(hdgs);
+
+            tack.recoverySpeed = averageSpeed.result();
+
+            if (tack.targetSpeed && tack.recoverySpeed < tack.targetSpeed * 0.9) {
+                tack.notes.push('* never came back up to speed');
+            }
         },
 
         convertIndexesToTimes: function convertIndexesToTimes(tack, data) {
@@ -224,46 +281,43 @@
      
 
     function findManeuvers(data) {
-        function getBoard(point) {
-            var board = null;
+        function board(point) {
+            var b = null;
             if ( 'twa' in point ) {
-                board = 'U-S';
+                b = 'U-S';
                 if (-90 <= point.twa && point.twa < 0)
-                    board = 'U-P';
+                    b = 'U-P';
                 else if (point.twa < -90)
-                    board = 'D-P';
+                    b = 'D-P';
                 else if (point.twa > 90)
-                    board = 'D-S';
+                    b = 'D-S';
 
                 if (point.ot < 300) {
-                    board = "PS";
+                    b = "PS";
                 }
             }
-            return board;
+            return b;
         }
 
-        return _.map(homegrown.streamingUtilities.createChangeDataSegments(data, getBoard), function(b) {
-            b.board = b.value;
-            return b;
-        });
+        return homegrown.streamingUtilities.createChangeDataSegments(data, board);
     }
 
     function findLegs(data) {
-        function getLeg(point) {
-            var leg = null;
+        function leg(point) {
+            var l = null;
             if (point.ot < 300) {
-                leg = "PS";
+                l = "PS";
             }
             else if ('twa' in point) {
                 if (Math.abs(point.twa) < 90)
-                    leg = 'Upwind';
+                    l = 'Upwind';
                 else 
-                    leg = 'Downwind';
+                    l = 'Downwind';
             }
-            return leg;
+            return l;
         }
 
-        return homegrown.streamingUtilities.createChangeDataSegments(data, getLeg);
+        return homegrown.streamingUtilities.createChangeDataSegments(data, leg);
     }
 
     function analyzeTacks(maneuvers, data) {
@@ -292,8 +346,8 @@
                     board: maneuvers[i].board,
                     timing: {},
                     notes: [],
-                    data: getSliceAroundTime(data, maneuvers[i].start, 20, 40),
-                    track: getSliceAroundTime(data, maneuvers[i].start, 15, 20),
+                    data: getSliceAroundTime(data, maneuvers[i].start, 20, 120),
+                    track: getSliceAroundTime(data, maneuvers[i].start, 15, 30),
                 };
                 
                 //process tack, by running steps in this order.

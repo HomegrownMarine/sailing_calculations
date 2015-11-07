@@ -1,7 +1,7 @@
 {
     "name": "homegrown-sailing",
     "description": "Bunch of sailing related functions and utilities.",
-    "version": "0.0.8",
+    "version": "0.1.0",
     "main": "dist/sailing.js",
     "ignore": [
     ]
