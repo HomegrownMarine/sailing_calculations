@@ -128,6 +128,16 @@
             //drift is the magnitude of the current vector
             var _drift = Math.sqrt(current_x * current_x + current_y * current_y);
             return _drift;
+        },
+
+        circularMean: function circularMean(dat) {
+            var sinComp = 0, cosComp = 0;
+            _.each(dat, function(angle) {
+                sinComp += Math.sin(rad(angle));
+                cosComp += Math.cos(rad(angle));
+            });
+
+            return (360+deg(Math.atan2(sinComp/dat.length, cosComp/dat.length)))%360;
         }
     };
 
