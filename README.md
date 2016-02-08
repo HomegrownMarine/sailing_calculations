@@ -4,7 +4,10 @@ github/homegrownmarine
 
 
 TODO:
-- build files into one include
-- make that include main.
+- docs
 
-This incarnation is untested.  See http://gradymorgan.com/analysis/race.html?2014_nas_4 to see these in action.
+This incarnation is semi-tested.  See http://gradymorgan.com/signal/race.html?2015_worlds_3 to see it in action.
+
+## License
+
+MIT © [Grady Morgan]()
