@@ -1,5 +1,11 @@
-(function() {
-    "use strict";
+(function (global, factory) {
+    if (typeof exports === 'object' && typeof module !== 'undefined') {
+        factory(exports, require('lodash'));
+    }
+    else {
+        factory((global.homegrown.calculations = {}), global._);
+    }
+}(this, function (exports, _) { 'use strict';
 
     var R = 3440.06479; //radius of earth in nautical miles
 
@@ -16,6 +22,9 @@
     };
 
     var calcs = {
+        // adjustedAwa: function awa(awa, heel) {
+        //     return deg(atan( tan(rad(awa)) / cos(rad(heel)) ));
+        // },
         tws: function tws(speed, awa, aws) {
             //TODO: heel compensation
             return lawOfCosines(speed, aws, awa);
@@ -128,28 +137,8 @@
             //drift is the magnitude of the current vector
             var _drift = Math.sqrt(current_x * current_x + current_y * current_y);
             return _drift;
-        },
-
-        circularMean: function circularMean(dat) {
-            var sinComp = 0, cosComp = 0;
-            _.each(dat, function(angle) {
-                sinComp += Math.sin(rad(angle));
-                cosComp += Math.cos(rad(angle));
-            });
-
-            return (360+deg(Math.atan2(sinComp/dat.length, cosComp/dat.length)))%360;
         }
     };
 
-    
-    if (typeof exports != 'undefined') {
-        exports.calcs = calcs;
-    } else if (typeof module !== 'undefined' && module.exports) {
-        module.exports = calcs;
-    } else {
-        if ( typeof homegrown == 'undefined' ) {
-            window.homegrown = {};
-        }
-        homegrown.calculations = calcs;
-    }
-})();
+    _.extend(exports, calcs);
+}));

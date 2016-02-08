@@ -1,13 +1,12 @@
-(function() {
-    "use strict";
-    var _;
-
-    if ( typeof window != 'undefined' ) {
-        _ = window._;
+homegrown={};
+(function (global, factory) {
+    if (typeof exports === 'object' && typeof module !== 'undefined') {
+        factory(exports, require('lodash'));
     }
-    else if ( typeof require == 'function' ) {
-        _ = require('lodash');
+    else {
+        factory((global.homegrown.utilities = {}), global._);
     }
+}(this, function (exports, _) {'use strict';
 
     //from stack overflow
     var remove_comments_regex = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
@@ -34,6 +33,8 @@
          * assert acceleration({'speed': 5, 't':1000}) == {'acceleration': 0}
          * assert acceleration({'speed': 6, 't':1000}) == {'acceleration': 1}
          */
+
+        //TODO: rename derivative
         derivitive: function derivitive(name, metric, scaleFactor) {
             scaleFactor = scaleFactor || 1;
             var lastValue = null, lastTime;
@@ -231,21 +232,28 @@
             }
 
             return segments;
+        }, 
+        circularMean: function circularMean(dat) {
+            var sinComp = 0, cosComp = 0;
+            _.each(dat, function(angle) {
+                sinComp += Math.sin(rad(angle));
+                cosComp += Math.cos(rad(angle));
+            });
+
+            return (360+deg(Math.atan2(sinComp/dat.length, cosComp/dat.length)))%360;
         }
     };
 
-    if (typeof exports != 'undefined') {
-        exports.utilities = utilities;
-    } else if (typeof module !== 'undefined' && module.exports) {
-        module.exports.utilities = utilities;
-    } else {
-        if ( typeof homegrown == 'undefined' ) {
-            window.homegrown = {};
-        }
-        homegrown.streamingUtilities = utilities;
+    _.extend(exports, utilities);
+}));
+(function (global, factory) {
+    if (typeof exports === 'object' && typeof module !== 'undefined') {
+        factory(exports, require('lodash'));
     }
-})();;(function() {
-    "use strict";
+    else {
+        factory((global.homegrown.calculations = {}), global._);
+    }
+}(this, function (exports, _) { 'use strict';
 
     var R = 3440.06479; //radius of earth in nautical miles
 
@@ -262,6 +270,9 @@
     };
 
     var calcs = {
+        // adjustedAwa: function awa(awa, heel) {
+        //     return deg(atan( tan(rad(awa)) / cos(rad(heel)) ));
+        // },
         tws: function tws(speed, awa, aws) {
             //TODO: heel compensation
             return lawOfCosines(speed, aws, awa);
@@ -374,46 +385,20 @@
             //drift is the magnitude of the current vector
             var _drift = Math.sqrt(current_x * current_x + current_y * current_y);
             return _drift;
-        },
-
-        circularMean: function circularMean(dat) {
-            var sinComp = 0, cosComp = 0;
-            _.each(dat, function(angle) {
-                sinComp += Math.sin(rad(angle));
-                cosComp += Math.cos(rad(angle));
-            });
-
-            return (360+deg(Math.atan2(sinComp/dat.length, cosComp/dat.length)))%360;
         }
     };
 
-    
-    if (typeof exports != 'undefined') {
-        exports.calcs = calcs;
-    } else if (typeof module !== 'undefined' && module.exports) {
-        module.exports = calcs;
-    } else {
-        if ( typeof homegrown == 'undefined' ) {
-            window.homegrown = {};
-        }
-        homegrown.calculations = calcs;
-    }
-})();
-;(function() {
-    "use strict";
-    var _, moment, circularMean;
+    _.extend(exports, calcs);
+}));
 
-    if ( typeof window != 'undefined' ) {
-        _ = window._;
-        moment = window.moment;
-        circularMean = homegrown.calculations.circularMean;
+(function (global, factory) {
+    if (typeof exports === 'object' && typeof module !== 'undefined') {
+        factory(exports, require('lodash'), require('moment'), require('./calcs.js'));
     }
-    else if( typeof require == 'function' ) {
-        _ = require('lodash');
-        moment = require('moment');
-        //circularMean = //TODO
+    else {
+        factory((global.homegrown.maneuvers = {}), global._, global.moment, global.homegrown.utilities);
     }
-
+}(this, function (exports, _, moment, utilities) {'use strict';
     function mean() {
         var sum = 0, count = 0;
 
@@ -431,7 +416,10 @@
 
     //each of these functions takes a "tack" object, and 
     //a section of data around the tack and adds some specific
-    //metric(s) to the tack
+    //metric(s) to the tack, either finding a new critical point,
+    //or some property, like entry Speed, that will be used later
+    //in the algorithm.  analyzeTacks() below uses these to build
+    //a 'picture' of a tack.
     var tackUtils = {
         findCenter: function findCenter(tack, data) {
             var centerIdx;
@@ -512,7 +500,7 @@
             tack.entryVmg = averageVmg.result();
             tack.entrySpeed = averageSpeed.result();
             tack.entryTwa = averageTwa.result();
-            tack.entryHdg = circularMean(hdgs);
+            tack.entryHdg = utilities.circularMean(hdgs);
 
             var targetSpeed = averageTgtSpd.result();
 
@@ -606,7 +594,7 @@
             }
 
             tack.recoveryTwa = averageTwa.result();
-            tack.recoveryHdg = circularMean(hdgs);
+            tack.recoveryHdg = utilities.circularMean(hdgs);
 
             tack.recoverySpeed = averageSpeed.result();
 
@@ -656,7 +644,7 @@
             }
 
             tack.tws = twsSum / twsCount;
-            tack.twd = circularMean(twds);
+            tack.twd = utilities.circularMean(twds);
         }
     };
 
@@ -700,7 +688,7 @@
             return b;
         }
 
-        return homegrown.streamingUtilities.createChangeDataSegments(data, board);
+        return utilities.createChangeDataSegments(data, board);
     }
 
     function findLegs(data) {
@@ -718,7 +706,7 @@
             return l;
         }
 
-        return homegrown.streamingUtilities.createChangeDataSegments(data, leg);
+        return utilities.createChangeDataSegments(data, leg);
     }
 
     function analyzeTacks(maneuvers, data) {
@@ -772,21 +760,11 @@
         return tacks;
     }
 
-    var maneuverUtilities = {
+    _.extend(exports, {
         findManeuvers: findManeuvers,
         analyzeTacks: analyzeTacks,
         getSliceAroundTime: getSliceAroundTime,
-        getSliceBetweenTimes: getSliceBetweenTimes
-    };
+        getSliceBetweenTimes: getSliceBetweenTimes        
+    });
 
-    if (typeof exports != 'undefined') {
-        exports.maneuvers = maneuverUtilities;
-    } else if (typeof module != 'undefined' && module.exports) {
-        module.exports.maneuvers = maneuverUtilities;
-    } else {
-        if ( typeof homegrown == 'undefined' ) {
-            window.homegrown = {};
-        }
-        homegrown.maneuvers = maneuverUtilities;
-    }
-})();
+}));

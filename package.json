@@ -1,9 +1,9 @@
 {
   "name": "homegrown-sailing",
   "description": "Bunch of sailing related functions and utilities.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "homepage": "http://homegrownmarine.com",
-  "main": "dist/sailing.js",
+  "main": "index.js",
   "keywords": [
     "performance",
     "sailing",
@@ -21,17 +21,36 @@
     }
   ],
   "dependencies": {
-    "lodash": "*",
-    "moment": "^2.9.0"
+    "lodash": "^4.2.1",
+    "moment": "^2.11.2"
+  },
+  "scripts": {
+    "postpublish": "VERSION=`node -e 'console.log(require(\"./package.json\").version)'`; git push && git tag -am \"Release $VERSION.\" v${VERSION} && git push --tags"
   },
   "devDependencies": {
-    "mocha": "*",
+    "babel-core": "^5.5.6",
     "chai": "*",
-    "grunt": "^0.4.5",
-    "grunt-contrib-jshint": "^0.10.0",
-    "grunt-contrib-uglify": "^0.5.1",
-    "grunt-contrib-watch": "^0.6.1",
-    "grunt-contrib-concat": "^0.5.0",
-    "grunt-mocha-test": "^0.11.0"
+    "del": "^1.1.1",
+    "gulp": "^3.9.0",
+    "gulp-autoprefixer": "^2.3.1",
+    "gulp-concat": "^2.6.0",
+    "gulp-eslint": "^0.13.2",
+    "gulp-file": "^0.2.0",
+    "gulp-if": "^1.2.5",
+    "gulp-load-plugins": "^0.10.0",
+    "gulp-sourcemaps": "^1.5.0",
+    "mocha": "*"
+  },
+  "eslintConfig": {
+    "env": {
+      "node": true,
+      "browser": true
+    },
+    "rules": {
+      "quotes": [
+        4,
+        "single"
+      ]
+    }
   }
 }

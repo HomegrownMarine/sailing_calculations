@@ -1,18 +1,11 @@
-(function() {
-    "use strict";
-    var _, moment, circularMean;
-
-    if ( typeof window != 'undefined' ) {
-        _ = window._;
-        moment = window.moment;
-        circularMean = homegrown.calculations.circularMean;
+(function (global, factory) {
+    if (typeof exports === 'object' && typeof module !== 'undefined') {
+        factory(exports, require('lodash'), require('moment'), require('./calcs.js'));
     }
-    else if( typeof require == 'function' ) {
-        _ = require('lodash');
-        moment = require('moment');
-        //circularMean = //TODO
+    else {
+        factory((global.homegrown.maneuvers = {}), global._, global.moment, global.homegrown.utilities);
     }
-
+}(this, function (exports, _, moment, utilities) {'use strict';
     function mean() {
         var sum = 0, count = 0;
 
@@ -30,7 +23,10 @@
 
     //each of these functions takes a "tack" object, and 
     //a section of data around the tack and adds some specific
-    //metric(s) to the tack
+    //metric(s) to the tack, either finding a new critical point,
+    //or some property, like entry Speed, that will be used later
+    //in the algorithm.  analyzeTacks() below uses these to build
+    //a 'picture' of a tack.
     var tackUtils = {
         findCenter: function findCenter(tack, data) {
             var centerIdx;
@@ -111,7 +107,7 @@
             tack.entryVmg = averageVmg.result();
             tack.entrySpeed = averageSpeed.result();
             tack.entryTwa = averageTwa.result();
-            tack.entryHdg = circularMean(hdgs);
+            tack.entryHdg = utilities.circularMean(hdgs);
 
             var targetSpeed = averageTgtSpd.result();
 
@@ -205,7 +201,7 @@
             }
 
             tack.recoveryTwa = averageTwa.result();
-            tack.recoveryHdg = circularMean(hdgs);
+            tack.recoveryHdg = utilities.circularMean(hdgs);
 
             tack.recoverySpeed = averageSpeed.result();
 
@@ -255,7 +251,7 @@
             }
 
             tack.tws = twsSum / twsCount;
-            tack.twd = circularMean(twds);
+            tack.twd = utilities.circularMean(twds);
         }
     };
 
@@ -299,7 +295,7 @@
             return b;
         }
 
-        return homegrown.streamingUtilities.createChangeDataSegments(data, board);
+        return utilities.createChangeDataSegments(data, board);
     }
 
     function findLegs(data) {
@@ -317,7 +313,7 @@
             return l;
         }
 
-        return homegrown.streamingUtilities.createChangeDataSegments(data, leg);
+        return utilities.createChangeDataSegments(data, leg);
     }
 
     function analyzeTacks(maneuvers, data) {
@@ -371,21 +367,11 @@
         return tacks;
     }
 
-    var maneuverUtilities = {
+    _.extend(exports, {
         findManeuvers: findManeuvers,
         analyzeTacks: analyzeTacks,
         getSliceAroundTime: getSliceAroundTime,
-        getSliceBetweenTimes: getSliceBetweenTimes
-    };
+        getSliceBetweenTimes: getSliceBetweenTimes        
+    });
 
-    if (typeof exports != 'undefined') {
-        exports.maneuvers = maneuverUtilities;
-    } else if (typeof module != 'undefined' && module.exports) {
-        module.exports.maneuvers = maneuverUtilities;
-    } else {
-        if ( typeof homegrown == 'undefined' ) {
-            window.homegrown = {};
-        }
-        homegrown.maneuvers = maneuverUtilities;
-    }
-})();
+}));

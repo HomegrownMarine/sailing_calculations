@@ -1,13 +1,11 @@
-(function() {
-    "use strict";
-    var _;
-
-    if ( typeof window != 'undefined' ) {
-        _ = window._;
+(function (global, factory) {
+    if (typeof exports === 'object' && typeof module !== 'undefined') {
+        factory(exports, require('lodash'));
     }
-    else if ( typeof require == 'function' ) {
-        _ = require('lodash');
+    else {
+        factory((global.homegrown.utilities = {}), global._);
     }
+}(this, function (exports, _) {'use strict';
 
     //from stack overflow
     var remove_comments_regex = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
@@ -34,6 +32,8 @@
          * assert acceleration({'speed': 5, 't':1000}) == {'acceleration': 0}
          * assert acceleration({'speed': 6, 't':1000}) == {'acceleration': 1}
          */
+
+        //TODO: rename derivative
         derivitive: function derivitive(name, metric, scaleFactor) {
             scaleFactor = scaleFactor || 1;
             var lastValue = null, lastTime;
@@ -231,17 +231,17 @@
             }
 
             return segments;
+        }, 
+        circularMean: function circularMean(dat) {
+            var sinComp = 0, cosComp = 0;
+            _.each(dat, function(angle) {
+                sinComp += Math.sin(rad(angle));
+                cosComp += Math.cos(rad(angle));
+            });
+
+            return (360+deg(Math.atan2(sinComp/dat.length, cosComp/dat.length)))%360;
         }
     };
 
-    if (typeof exports != 'undefined') {
-        exports.utilities = utilities;
-    } else if (typeof module !== 'undefined' && module.exports) {
-        module.exports.utilities = utilities;
-    } else {
-        if ( typeof homegrown == 'undefined' ) {
-            window.homegrown = {};
-        }
-        homegrown.streamingUtilities = utilities;
-    }
-})();
+    _.extend(exports, utilities);
+}));
