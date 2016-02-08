@@ -1,4 +1,4 @@
-homegrown={};
+this.homegrown=this.homegrown||{};
 (function (global, factory) {
     if (typeof exports === 'object' && typeof module !== 'undefined') {
         factory(exports, require('lodash'));
